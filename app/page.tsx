@@ -36,8 +36,8 @@ function ConsensusSummary({ papers }: { papers: SearchResult["papers"] }) {
   const disagreeing = scores.filter((s) => s < -0.3).length;
 
   return (
-    <div className="mb-6 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-      <div className="flex items-center gap-6">
+    <div className="mb-5 p-4 bg-white rounded-2xl border border-slate-200">
+      <div className="flex items-center gap-5">
         <ConsensusMeter score={avg} total={scores.length} />
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-1.5 text-emerald-600">
@@ -156,25 +156,32 @@ export default function Home() {
   }, [filters, corpus]);
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center gap-4">
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-              <FileQuestion className="w-4 h-4 text-white" />
+        <div className="max-w-7xl mx-auto px-6 h-[4.5rem] flex items-center gap-5">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 flex-shrink-0">
+            <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-sm">
+              <FileQuestion className="w-[18px] h-[18px] text-white" />
             </div>
-            <span className="font-bold text-lg text-slate-900">Consensus</span>
+            <span className="font-semibold text-[17px] text-slate-800 tracking-tight">Consensus</span>
           </div>
-          <div className="flex-1 max-w-2xl">
+
+          {/* Search */}
+          <div className="flex-1 max-w-3xl mx-auto">
             <SearchBar onSearch={(q) => doSearch(q, 0)} isLoading={isLoading} />
           </div>
-          <MedicalModeToggle onToggle={handleCorpusChange} />
+
+          {/* Corpus toggle */}
+          <div className="flex-shrink-0">
+            <MedicalModeToggle onToggle={handleCorpusChange} />
+          </div>
         </div>
       </header>
 
       {/* Main */}
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-7xl mx-auto px-6 py-6">
         {query && results && (
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -199,7 +206,7 @@ export default function Home() {
 
         <div className="flex gap-6">
           {/* Sidebar */}
-          <div className="w-64 flex-shrink-0 space-y-4">
+          <div className="w-64 flex-shrink-0 space-y-3">
             <SearchHistory onSearch={(q) => doSearch(q, 0)} />
             <FilterSidebar
               onFilterChange={setFilters}

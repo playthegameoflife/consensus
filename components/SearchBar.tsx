@@ -56,9 +56,9 @@ export function SearchBar({ onSearch, isLoading, initialQuery = "" }: SearchBarP
   };
 
   return (
-    <div className="relative w-full max-w-2xl mx-auto">
-      <div className="relative flex items-center">
-        <Search className="absolute left-4 w-5 h-5 text-slate-400 pointer-events-none" />
+    <div className="relative w-full">
+      <div className="relative flex items-center bg-white rounded-full border border-slate-200/80 transition-colors focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+        <Search className="absolute left-4 w-4 h-4 text-slate-400 pointer-events-none" />
         <Input
           type="text"
           value={query}
@@ -67,11 +67,11 @@ export function SearchBar({ onSearch, isLoading, initialQuery = "" }: SearchBarP
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           placeholder="Ask a research question..."
-          className="pl-12 pr-12 h-14 text-lg border-slate-200 rounded-full shadow-sm focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="pl-11 pr-12 h-14 text-[15px] border-0 shadow-none bg-transparent focus-visible:ring-0 focus-visible:outline-none placeholder:text-slate-400"
           disabled={isLoading}
         />
         {isLoading && (
-          <Loader2 className="absolute right-4 w-5 h-5 text-slate-400 animate-spin" />
+          <Loader2 className="absolute right-4 w-4 h-4 text-slate-400 animate-spin" />
         )}
         {query && !isLoading && (
           <button
@@ -81,7 +81,7 @@ export function SearchBar({ onSearch, isLoading, initialQuery = "" }: SearchBarP
             }}
             className="absolute right-4 p-1 rounded-full hover:bg-slate-100"
           >
-            <X className="w-4 h-4 text-slate-400" />
+            <X className="w-3.5 h-3.5 text-slate-400" />
           </button>
         )}
       </div>
