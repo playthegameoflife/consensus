@@ -4,7 +4,7 @@ import { extractAIFinding as extractAIFindingFromLib, extractAllClaims } from "@
 import { fetchPaperPDF, hasPDFSource } from "@/lib/pdf-fetch";
 import { extractTextFromPDF } from "@/lib/pdf-extract";
 import { scoreConsensus } from "@/lib/consensus";
-import { Paper } from "@/lib/types";
+import { Paper, SortOrder, SearchFilters } from "@/lib/types";
 
 export const runtime = "edge";
 
@@ -22,19 +22,23 @@ export async function GET(req: NextRequest) {
   const openAccess = searchParams.get("openAccess") === "true";
   const mode = searchParams.get("mode") || "fast"; // "fast" or "deep"
   const corpus = searchParams.get("corpus") as "all" | "medical" | null;
+  const sortParam = searchParams.get("sort") as SortOrder | null;
 
   if (!query.trim()) {
     return NextResponse.json({ papers: [], total: 0, offset: 0 });
   }
 
   try {
-    const filters: Parameters<typeof searchPapers>[3] = {};
+    const filters: SearchFilters = {};
     if (yearRange) {
       const [start, end] = yearRange.split("-").map(Number);
       filters.yearRange = [start, end];
     }
     if (openAccess) filters.openAccessOnly = true;
     if (corpus === "medical") filters.corpus = "medical";
+    if (sortParam && ["relevance", "newest", "cited", "consensus"].includes(sortParam)) {
+      filters.sort = sortParam as SortOrder;
+    }
 
     const result = await searchPapers(query, offset, limit, filters);
 

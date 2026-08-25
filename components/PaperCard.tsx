@@ -70,8 +70,11 @@ export function PaperCard({ paper, onSelect }: PaperCardProps) {
         )}
         {paper.year && <span className="text-xs text-slate-400">{paper.year}</span>}
         {paper.citationCount > 0 && (
-          <span className="text-xs text-slate-400">
-            {paper.citationCount.toLocaleString()} citations
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+            {paper.citationCount.toLocaleString()}
           </span>
         )}
       </div>

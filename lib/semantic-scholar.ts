@@ -1,4 +1,4 @@
-import { Paper, SearchResult, SearchFilters } from "./types";
+import { Paper, SearchResult, SearchFilters, SortOrder } from "./types";
 
 const BASE_URL = "https://api.semanticscholar.org/graph/v1";
 
@@ -45,6 +45,15 @@ export async function searchPapers(
     // Filter to medical-related fields of study
     const medicalFields = "Medicine,Biochemistry,Neuroscience,Psychology,Pharmacology,Cell Biology,Genetics,Molecular Biology";
     params.set("fieldsOfStudy", medicalFields);
+  }
+  if (filters?.sort) {
+    const sortMap: Record<SortOrder, string> = {
+      relevance: "relevance",
+      newest: "year:desc",
+      cited: "citationCount:desc",
+      consensus: "citationCount:desc", // consensus uses citation count as proxy before full scoring
+    };
+    params.set("sort", sortMap[filters.sort]);
   }
 
   const headers: HeadersInit = { Accept: "application/json" };

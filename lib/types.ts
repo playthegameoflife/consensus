@@ -30,6 +30,8 @@ export interface SearchResult {
   offset: number;
 }
 
+export type SortOrder = "relevance" | "newest" | "cited" | "consensus";
+
 export interface SearchFilters {
   year?: number;
   yearRange?: [number, number];
@@ -37,6 +39,7 @@ export interface SearchFilters {
   citationCountMin?: number;
   openAccessOnly?: boolean;
   corpus?: "all" | "medical";
+  sort?: SortOrder;
 }
 
 export interface ProcessedPaper extends Paper {

@@ -15,6 +15,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { CitationGraph } from "@/components/CitationGraph";
 import {
   X,
   ExternalLink,
@@ -238,11 +239,12 @@ export function EnhancedPaperDetailPanel({
           {/* Tabs */}
           <div className="px-6 flex-shrink-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full grid grid-cols-4 h-9 bg-slate-100">
+              <TabsList className="w-full grid grid-cols-5 h-9 bg-slate-100">
                 <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
                 <TabsTrigger value="claims" className="text-xs">Claims</TabsTrigger>
                 <TabsTrigger value="citations" className="text-xs">Citations</TabsTrigger>
                 <TabsTrigger value="related" className="text-xs">Related</TabsTrigger>
+                <TabsTrigger value="graph" className="text-xs">Graph</TabsTrigger>
               </TabsList>
 
               {/* Overview Tab */}
@@ -450,6 +452,16 @@ export function EnhancedPaperDetailPanel({
                     ))}
                   </>
                 )}
+              </TabsContent>
+
+              {/* Graph Tab */}
+              <TabsContent value="graph" className="pt-4">
+                <div className="rounded-xl border border-slate-200 overflow-hidden" style={{ height: 360 }}>
+                  <CitationGraph paper={paper} />
+                </div>
+                <p className="text-xs text-slate-400 mt-2 text-center">
+                  Click a node to expand · {citations.length} citing · {references.length} references
+                </p>
               </TabsContent>
             </Tabs>
           </div>

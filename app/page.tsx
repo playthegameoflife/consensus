@@ -9,10 +9,12 @@ import { EnhancedPaperDetailPanel } from "@/components/EnhancedPaperDetailPanel"
 import { SearchHistory, addToHistory } from "@/components/SearchHistory";
 import { MedicalModeToggle, Corpus } from "@/components/MedicalModeToggle";
 import { Paper } from "@/lib/types";
-import { Loader2, Search, ArrowUp, ArrowDown, Minus, FileQuestion } from "lucide-react";
+import { Loader2, Search, ArrowUp, ArrowDown, Minus, FileQuestion, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ResultsTimeline } from "@/components/ResultsTimeline";
+import { RelatedSearches } from "@/components/RelatedSearches";
 
 interface SearchResult {
   papers: (Paper & { aiFinding?: string; consensusScore?: number })[];
@@ -70,6 +72,7 @@ export default function Home() {
   const [corpus, setCorpus] = useState<Corpus>("all");
   const [selectedPaper, setSelectedPaper] = useState<(Paper & { aiFinding?: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [searchTime, setSearchTime] = useState<number | null>(null);
 
   // Medical mode default study types
   const medicalDefaultStudyTypes = ["Clinical Trial", "RCT", "Systematic Review", "Meta-Analysis"];
@@ -77,9 +80,11 @@ export default function Home() {
   const doSearch = useCallback(
     async (q: string, offset = 0) => {
       if (!q.trim()) return;
+      const startTime = Date.now();
       if (offset === 0) {
         setQuery(q);
         setIsLoading(true);
+        setSearchTime(null);
         // Add to search history
         addToHistory(q);
       } else {
@@ -102,10 +107,15 @@ export default function Home() {
         if (corpus === "medical") {
           params.set("corpus", "medical");
         }
+        if (filters.sort && filters.sort !== "relevance") {
+          params.set("sort", filters.sort);
+        }
 
         const res = await fetch(`/api/search?${params}`);
         if (!res.ok) throw new Error("Search failed");
         const data: SearchResult = await res.json();
+
+        setSearchTime(Date.now() - startTime);
 
         setResults((prev) => {
           if (offset === 0) {
@@ -166,11 +176,19 @@ export default function Home() {
       {/* Main */}
       <main className="max-w-6xl mx-auto px-4 py-6">
         {query && results && (
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm text-slate-500">
-              {results.total.toLocaleString()} results for{" "}
-              <span className="font-medium text-slate-700">"{query}"</span>
-            </p>
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-slate-500">
+                <span className="font-semibold text-slate-800">{results.total.toLocaleString()}</span> results for{" "}
+                <span className="font-medium text-slate-700">"{query}"</span>
+              </p>
+              {searchTime !== null && (
+                <span className="flex items-center gap-1 text-xs text-slate-400">
+                  <Clock className="w-3 h-3" />
+                  {searchTime < 1000 ? `${searchTime}ms` : `${(searchTime / 1000).toFixed(1)}s`}
+                </span>
+              )}
+            </div>
             {corpus === "medical" && (
               <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
                 Medical Mode
@@ -235,6 +253,16 @@ export default function Home() {
             {!isLoading && results && results.papers.length > 0 && (
               <>
                 <ConsensusSummary papers={results.papers} />
+                <RelatedSearches
+                  query={query}
+                  papers={results.papers}
+                  onSearch={(q) => doSearch(q, 0)}
+                />
+                <ResultsTimeline
+                  papers={results.papers}
+                  onSelect={setSelectedPaper}
+                  selectedPaperId={selectedPaper?.paperId}
+                />
                 <div className="space-y-3">
                   {results.papers.map((paper) => (
                     <PaperCard

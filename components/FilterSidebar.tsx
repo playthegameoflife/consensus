@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, RotateCcw } from "lucide-react";
+import { ChevronDown, RotateCcw, ArrowUpDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SortOrder } from "@/lib/types";
 
 interface FilterSidebarProps {
   onFilterChange: (filters: Filters) => void;
@@ -19,7 +26,15 @@ export interface Filters {
   studyTypes: string[];
   openAccessOnly: boolean;
   citationMin: number;
+  sort?: SortOrder;
 }
+
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: "relevance", label: "Relevance" },
+  { value: "newest", label: "Newest First" },
+  { value: "cited", label: "Most Cited" },
+  { value: "consensus", label: "Consensus" },
+];
 
 const STUDY_TYPES = [
   "Meta-Analysis",
@@ -45,6 +60,7 @@ export function FilterSidebar({ onFilterChange, totalResults, defaultStudyTypes 
     studyTypes: defaultStudyTypes || [],
     openAccessOnly: false,
     citationMin: 0,
+    sort: "relevance",
   });
 
   const [openSections, setOpenSections] = useState({
@@ -79,7 +95,7 @@ export function FilterSidebar({ onFilterChange, totalResults, defaultStudyTypes 
   };
 
   const reset = () => {
-    const def: Filters = { yearRange: [1900, 2026], studyTypes: [], openAccessOnly: false, citationMin: 0 };
+    const def: Filters = { yearRange: [1900, 2026], studyTypes: [], openAccessOnly: false, citationMin: 0, sort: "relevance" };
     setFilters(def);
     onFilterChange(def);
   };
@@ -92,6 +108,31 @@ export function FilterSidebar({ onFilterChange, totalResults, defaultStudyTypes 
             {totalResults.toLocaleString()} results
           </div>
         )}
+
+        {/* Sort Dropdown */}
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-slate-400 flex items-center gap-1">
+            <ArrowUpDown className="w-3 h-3" />
+            Sort
+          </span>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-0.5 cursor-pointer">
+              {SORT_OPTIONS.find((o) => o.value === filters.sort)?.label || "Relevance"}
+              <ChevronDown className="w-3 h-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[140px]">
+              {SORT_OPTIONS.map((opt) => (
+                <DropdownMenuItem
+                  key={opt.value}
+                  onClick={() => update({ sort: opt.value })}
+                  className={`text-xs cursor-pointer ${filters.sort === opt.value ? "text-blue-700 font-medium" : ""}`}
+                >
+                  {opt.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         <button
           onClick={reset}
