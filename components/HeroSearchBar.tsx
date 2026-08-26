@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Plus, ChevronDown, Sparkles, SlidersHorizontal, ArrowRight, Mic } from "lucide-react";
+import { Plus, ChevronDown, Sparkles, SlidersHorizontal, ArrowRight, X } from "lucide-react";
 
 interface HeroSearchBarProps {
   onSearch: (query: string) => void;
@@ -55,12 +55,15 @@ export function HeroSearchBar({
       {/* Search bar */}
       <div className="relative bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md focus-within:shadow-md focus-within:border-slate-300 transition-all">
         <div className="flex items-center gap-1 pl-2 pr-2 py-2">
-          {/* Plus button */}
+          {/* Plus button — clears query and focuses (New thread) */}
           <button
             type="button"
             className="flex-shrink-0 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 transition-colors"
             title="New thread"
-            onClick={() => inputRef.current?.focus()}
+            onClick={() => {
+              setQuery("");
+              inputRef.current?.focus();
+            }}
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -118,10 +121,28 @@ export function HeroSearchBar({
             }}
             placeholder="Ask the research..."
             disabled={isLoading}
-            className="flex-1 min-w-0 bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400 px-1"
+            className="flex-1 min-w-0 bg-transparent outline-none text-sm text-slate-800 placeholder:text-slate-400 px-2"
           />
 
-          {/* Filter button */}
+          {/* Clear (X) when query has text */}
+          {query && !isLoading && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                inputRef.current?.focus();
+              }}
+              className="flex-shrink-0 w-7 h-7 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-colors"
+              title="Clear"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* Vertical divider before Filter */}
+          <div className="h-5 w-px bg-slate-200 mx-1" />
+
+          {/* Filter button — icon only, matching consensus.app */}
           <button
             type="button"
             className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
