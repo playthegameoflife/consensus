@@ -101,9 +101,14 @@ async function synthesizeAnswer(
   query: string,
   depth: string
 ): Promise<string> {
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
-  if (!GROQ_API_KEY) {
-    return `Based on ${papers.length} papers found for "${query}". Add GROQ_API_KEY to .env.local to enable AI synthesis.`;
+  const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+  const GROQ_KEY = process.env.GROQ_API_KEY;
+  const LLM_KEY = OPENROUTER_KEY || GROQ_KEY;
+
+  console.log("[ProSearch] OPENROUTER_KEY present:", !!OPENROUTER_KEY);
+
+  if (!LLM_KEY) {
+    return `Based on ${papers.length} papers found for "${query}". Add OPENROUTER_API_KEY to .env.local to enable AI synthesis.`;
   }
 
   const paperSummaries = papers
@@ -126,15 +131,30 @@ ${paperSummaries}
 
 Respond with a well-structured answer (3-5 paragraphs) grounded ONLY in the papers above. Do not invent findings.`;
 
+  const model = OPENROUTER_KEY
+    ? (process.env.OPENROUTER_MODEL || "deepseek/deepseek-v4-flash-0731")
+    : "llama-3.1-8b-instant";
+  const url = OPENROUTER_KEY
+    ? "https://openrouter.ai/api/v1/chat/completions"
+    : "https://api.groq.com/openai/v1/chat/completions";
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (OPENROUTER_KEY) {
+    headers["Authorization"] = `Bearer ${OPENROUTER_KEY}`;
+    headers["HTTP-Referer"] = "https://consensus-clone.app";
+    headers["X-Title"] = "Consensus Clone";
+  } else {
+    headers["Authorization"] = `Bearer ${GROQ_KEY}`;
+  }
+
   try {
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const res = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
+        model,
         messages: [
           {
             role: "system",
@@ -143,16 +163,26 @@ Respond with a well-structured answer (3-5 paragraphs) grounded ONLY in the pape
           },
           { role: "user", content: prompt },
         ],
-        max_tokens: 800,
+        max_tokens: 4000,
         temperature: 0.3,
       }),
     });
 
-    if (!res.ok) return `Synthesis failed (${res.status}).`;
-
+    console.log("[ProSearch] LLM status:", res.status);
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "unknown");
+      return `Synthesis failed (${res.status}): ${errText.slice(0, 200)}.`;
+    }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() || "No synthesis available.";
-  } catch {
+    const choice = data.choices?.[0];
+    let content = choice?.message?.content?.trim();
+    // DeepSeek puts answer in reasoning field when content is empty
+    if (!content && choice?.message?.reasoning) {
+      content = choice.message.reasoning.trim();
+    }
+    return content || "No synthesis available.";
+  } catch (err) {
+    console.log("[ProSearch] LLM catch error:", err);
     return "Synthesis unavailable.";
   }
 }

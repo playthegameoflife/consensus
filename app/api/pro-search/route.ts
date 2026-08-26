@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runProSearch } from "@/lib/pro-search";
 
-export const runtime = "edge";
+// Using nodejs runtime for reliable OpenRouter API access
+export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

@@ -1,11 +1,72 @@
 import { Paper } from "./types";
 
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+// LLM provider detection: OpenRouter → Groq → abstract-only fallback
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-v4-flash-0731";
+const GROQ_KEY = process.env.GROQ_API_KEY;
 
-export async function extractAIFinding(paper: Paper, query: string): Promise<string | undefined> {
-  if (!GROQ_API_KEY) {
-    // Fallback: return a generic finding from abstract
+const LLM_URL = OPENROUTER_KEY
+  ? "https://openrouter.ai/api/v1/chat/completions"
+  : "https://api.groq.com/openai/v1/chat/completions";
+
+const LLM_KEY = OPENROUTER_KEY || GROQ_KEY;
+const LLM_MODEL = OPENROUTER_KEY ? OPENROUTER_MODEL : "llama-3.1-8b-instant";
+
+function hasLLM() {
+  return !!LLM_KEY;
+}
+
+async function callLLM(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number
+): Promise<string | undefined> {
+  if (!LLM_KEY) return undefined;
+
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (OPENROUTER_KEY) {
+      headers["Authorization"] = `Bearer ${OPENROUTER_KEY}`;
+      headers["HTTP-Referer"] = "https://consensus-clone.app";
+      headers["X-Title"] = "Consensus Clone";
+    } else {
+      headers["Authorization"] = `Bearer ${GROQ_KEY}`;
+    }
+
+    const res = await fetch(LLM_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: LLM_MODEL,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        max_tokens: maxTokens,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!res.ok) return undefined;
+    const data = await res.json();
+    let content = data.choices?.[0]?.message?.content?.trim();
+    // DeepSeek puts answer in reasoning field when content is empty
+    if (!content && data.choices?.[0]?.message?.reasoning) {
+      content = data.choices[0].message.reasoning.trim();
+    }
+    return content;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function extractAIFinding(
+  paper: Paper,
+  query: string
+): Promise<string | undefined> {
+  if (!hasLLM()) {
     return paper.abstract ? paper.abstract.slice(0, 200) + "..." : undefined;
   }
 
@@ -19,34 +80,12 @@ ${abstract}
 
 Respond with ONLY the key finding in 1-2 sentences. Be specific and quantitative when possible. If the paper is not relevant to the query, say "This paper may not directly address the query."`;
 
-  try {
-    const res = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful research assistant. Extract key findings from academic papers.",
-          },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 150,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!res.ok) return undefined;
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim();
-  } catch {
-    return undefined;
-  }
+  const result = await callLLM(
+    "You are a helpful research assistant. Extract key findings from academic papers.",
+    prompt,
+    150
+  );
+  return result || undefined;
 }
 
 export async function extractClaimsFromFullText(
@@ -54,17 +93,12 @@ export async function extractClaimsFromFullText(
   query: string,
   fullText: string
 ): Promise<string[]> {
-  if (!GROQ_API_KEY || !fullText || fullText.length < 100) {
-    return [];
-  }
+  if (!hasLLM() || !fullText || fullText.length < 100) return [];
 
-  // Use first 8000 chars to stay within context limits
   const truncatedText = fullText.slice(0, 8000);
-
   const prompt = `From this research paper, extract 3-5 key findings relevant to the query.
 
 Query: "${query}"
-
 Paper Title: ${paper.title}
 Paper Abstract: ${paper.abstract || "No abstract available"}
 
@@ -73,48 +107,26 @@ ${truncatedText}
 
 List each finding on a new line, starting with "- ". Be specific and include numbers and statistics when available. Focus on findings directly related to the query.`;
 
-  try {
-    const res = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful research assistant. Extract key findings from academic papers.",
-          },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 400,
-        temperature: 0.3,
-      }),
-    });
+  const text = await callLLM(
+    "You are a helpful research assistant. Extract key findings from academic papers.",
+    prompt,
+    400
+  );
 
-    if (!res.ok) return [];
-
-    const data = await res.json();
-    const text = data.choices?.[0]?.message?.content || "";
-    const claims = text
-      .split("\n")
-      .map((l: string) => l.replace(/^-\s*/, "").trim())
-      .filter(Boolean)
-      .filter((l: string) => l.length > 10);
-
-    return claims.slice(0, 5);
-  } catch {
-    return [];
-  }
+  if (!text) return [];
+  return text
+    .split("\n")
+    .map((l: string) => l.replace(/^-\s*/, "").trim())
+    .filter(Boolean)
+    .filter((l: string) => l.length > 10)
+    .slice(0, 5);
 }
 
 export async function extractClaimsFromAbstract(
   paper: Paper,
   query: string
 ): Promise<string[]> {
-  if (!GROQ_API_KEY) return [];
+  if (!hasLLM()) return [];
 
   const abstract = paper.abstract || "";
   if (!abstract) return [];
@@ -122,52 +134,29 @@ export async function extractClaimsFromAbstract(
   const prompt = `From this research paper, extract 3-5 key findings relevant to the query.
 
 Query: "${query}"
-
 Title: ${paper.title}
 Abstract: ${abstract}
 
 List each finding on a new line, starting with "- ". Be specific and include numbers when available.`;
 
-  try {
-    const res = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful research assistant. Extract key findings from academic papers.",
-          },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 300,
-        temperature: 0.3,
-      }),
-    });
+  const text = await callLLM(
+    "You are a helpful research assistant. Extract key findings from academic papers.",
+    prompt,
+    300
+  );
 
-    if (!res.ok) return [];
-
-    const data = await res.json();
-    const text = data.choices?.[0]?.message?.content || "";
-    const claims = text
-      .split("\n")
-      .map((l: string) => l.replace(/^-\s*/, "").trim())
-      .filter(Boolean)
-      .filter((l: string) => l.length > 10);
-
-    return claims.slice(0, 5);
-  } catch {
-    return [];
-  }
+  if (!text) return [];
+  return text
+    .split("\n")
+    .map((l: string) => l.replace(/^-\s*/, "").trim())
+    .filter(Boolean)
+    .filter((l: string) => l.length > 10)
+    .slice(0, 5);
 }
 
 /**
- * Master function that tries full text first, falls back to abstract
- * Returns claims for each paper
+ * Master function that tries full text first, falls back to abstract.
+ * Returns claims for each paper.
  */
 export async function extractAllClaims(
   papers: Paper[],
@@ -176,12 +165,10 @@ export async function extractAllClaims(
 ): Promise<Map<string, string[]>> {
   const results = new Map<string, string[]>();
 
-  // Process papers with full text first, then abstract fallback
   const withFullText: Paper[] = [];
   const abstractOnly: Paper[] = [];
 
   if (fullTextProvider) {
-    // Separate papers that have PDF sources
     for (const paper of papers) {
       const hasArxiv = !!paper.externalIds?.ArXiv;
       const hasOAPdf = !!paper.openAccessPdf?.url;
@@ -195,7 +182,6 @@ export async function extractAllClaims(
     abstractOnly.push(...papers);
   }
 
-  // Process full text papers
   await Promise.all(
     withFullText.map(async (paper) => {
       try {
@@ -204,7 +190,6 @@ export async function extractAllClaims(
           const claims = await extractClaimsFromFullText(paper, query, fullText);
           results.set(paper.paperId, claims);
         } else {
-          // Fallback to abstract
           const claims = await extractClaimsFromAbstract(paper, query);
           results.set(paper.paperId, claims);
         }
@@ -215,7 +200,6 @@ export async function extractAllClaims(
     })
   );
 
-  // Process abstract-only papers
   await Promise.all(
     abstractOnly.map(async (paper) => {
       try {
