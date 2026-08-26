@@ -1,0 +1,88 @@
+"use client";
+
+import { useState } from "react";
+import { Logo } from "./Logo";
+import { Plus, Home, PanelLeftClose } from "lucide-react";
+
+interface LeftSidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+export function LeftSidebar({ collapsed, onToggle }: LeftSidebarProps) {
+  if (collapsed) {
+    return (
+      <aside className="w-12 border-r border-slate-200 bg-white flex flex-col items-center py-4 gap-4 flex-shrink-0">
+        <Logo size={24} />
+        <button
+          onClick={onToggle}
+          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+          title="Expand sidebar"
+        >
+          <PanelLeftClose className="w-4 h-4 rotate-180" />
+        </button>
+        <div className="w-7 h-px bg-slate-200" />
+        <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500" title="New Thread">
+          <Plus className="w-4 h-4" />
+        </button>
+        <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500" title="Home">
+          <Home className="w-4 h-4" />
+        </button>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="w-64 border-r border-slate-200 bg-white flex flex-col flex-shrink-0">
+      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+        <Logo size={24} />
+        <button
+          onClick={onToggle}
+          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+          title="Collapse sidebar"
+        >
+          <PanelLeftClose className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="px-3 space-y-1">
+        <button className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-md transition-colors">
+          <Plus className="w-3.5 h-3.5" />
+          New Thread
+        </button>
+        <button className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-md transition-colors">
+          <Home className="w-3.5 h-3.5" />
+          Home
+        </button>
+      </div>
+
+      <div className="px-5 py-6 flex-1">
+        <h2 className="text-[15px] font-semibold text-slate-900 leading-tight mb-2">
+          Research<br />starts here
+        </h2>
+        <p className="text-[13px] text-slate-600 leading-relaxed">
+          Consensus is the AI-powered academic search engine
+        </p>
+        <p className="text-[13px] text-slate-600 leading-relaxed mt-3">
+          Search & analyze 220M+ peer reviewed research papers 📚
+        </p>
+        <p className="text-[13px] text-slate-600 leading-relaxed mt-3">
+          Transparent, reliable, and built to{" "}
+          <span className="text-cyan-600 underline decoration-cyan-300 underline-offset-2">
+            save you time
+          </span>{" "}
+          ⏱️
+        </p>
+      </div>
+
+      <div className="p-4 space-y-2 border-t border-slate-100">
+        <button className="w-full py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-full transition-colors">
+          Sign in
+        </button>
+        <button className="w-full py-2 text-sm font-medium text-white bg-cyan-500 hover:bg-cyan-600 rounded-full transition-colors">
+          Sign up
+        </button>
+      </div>
+    </aside>
+  );
+}

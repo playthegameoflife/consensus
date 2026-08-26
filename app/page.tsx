@@ -1,22 +1,18 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { SearchBar } from "@/components/SearchBar";
+import { Logo } from "@/components/Logo";
+import { LeftSidebar } from "@/components/LeftSidebar";
+import { HeroSearchBar } from "@/components/HeroSearchBar";
 import { PaperCard } from "@/components/PaperCard";
 import { ConsensusMeter } from "@/components/ConsensusMeter";
 import { FilterSidebar, Filters } from "@/components/FilterSidebar";
 import { EnhancedPaperDetailPanel } from "@/components/EnhancedPaperDetailPanel";
 import { SearchHistory, addToHistory } from "@/components/SearchHistory";
-import { MedicalModeToggle, Corpus } from "@/components/MedicalModeToggle";
-import { SearchModeToggle, SearchMode } from "@/components/SearchModeToggle";
-import { ScholarAgent } from "@/components/ScholarAgent";
 import { Paper } from "@/lib/types";
-import { Loader2, Search, ArrowUp, ArrowDown, Minus, FileQuestion, Clock, Bookmark, Sparkles } from "lucide-react";
+import { Loader2, Search, ArrowUp, ArrowDown, Minus, Clock, Bookmark, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ResultsTimeline } from "@/components/ResultsTimeline";
-import { RelatedSearches } from "@/components/RelatedSearches";
 
 interface SearchResult {
   papers: (Paper & { aiFinding?: string; consensusScore?: number })[];
@@ -71,36 +67,34 @@ export default function Home() {
     openAccessOnly: false,
     citationMin: 0,
   });
-  const [corpus, setCorpus] = useState<Corpus>("all");
-  const [searchMode, setSearchMode] = useState<SearchMode>("basic");
   const [selectedPaper, setSelectedPaper] = useState<(Paper & { aiFinding?: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchTime, setSearchTime] = useState<number | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [savedSearches, setSavedSearches] = useState<string[]>([]);
 
   // Load saved searches
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('consensus_saved_searches')
-      if (stored) setSavedSearches(JSON.parse(stored))
+      const stored = localStorage.getItem("consensus_saved_searches");
+      if (stored) setSavedSearches(JSON.parse(stored));
     } catch {}
-  }, [])
+  }, []);
 
   function toggleSaveSearch(q: string) {
-    let next: string[]
+    let next: string[];
     if (savedSearches.includes(q)) {
-      next = savedSearches.filter(s => s !== q)
+      next = savedSearches.filter((s) => s !== q);
     } else {
-      next = [q, ...savedSearches.filter(s => s !== q)].slice(0, 20)
+      next = [q, ...savedSearches.filter((s) => s !== q)].slice(0, 20);
     }
-    setSavedSearches(next)
-    try { localStorage.setItem('consensus_saved_searches', JSON.stringify(next)) } catch {}
+    setSavedSearches(next);
+    try {
+      localStorage.setItem("consensus_saved_searches", JSON.stringify(next));
+    } catch {}
   }
 
-  const isCurrentSaved = query ? savedSearches.includes(query) : false
-
-  // Medical mode default study types
-  const medicalDefaultStudyTypes = ["Clinical Trial", "RCT", "Systematic Review", "Meta-Analysis"];
+  const isCurrentSaved = query ? savedSearches.includes(query) : false;
 
   const doSearch = useCallback(
     async (q: string, offset = 0) => {
@@ -110,7 +104,6 @@ export default function Home() {
         setQuery(q);
         setIsLoading(true);
         setSearchTime(null);
-        // Add to search history
         addToHistory(q);
       } else {
         setIsLoadingMore(true);
@@ -121,19 +114,13 @@ export default function Home() {
         const params = new URLSearchParams({
           q,
           offset: String(offset),
-          limit: searchMode === 'deep' ? '50' : searchMode === 'pro' ? '20' : '10',
+          limit: "10",
         });
         if (filters.yearRange[0] !== 1900 || filters.yearRange[1] !== 2026) {
           params.set("yearRange", filters.yearRange.join("-"));
         }
         if (filters.openAccessOnly) {
           params.set("openAccess", "true");
-        }
-        if (corpus === "medical") {
-          params.set("corpus", "medical");
-        }
-        if (filters.sort && filters.sort !== "relevance") {
-          params.set("sort", filters.sort);
         }
 
         const res = await fetch(`/api/search?${params}`);
@@ -143,9 +130,7 @@ export default function Home() {
         setSearchTime(Date.now() - startTime);
 
         setResults((prev) => {
-          if (offset === 0) {
-            return data;
-          }
+          if (offset === 0) return data;
           return {
             ...data,
             papers: [...(prev?.papers || []), ...data.papers],
@@ -159,7 +144,7 @@ export default function Home() {
         setIsLoadingMore(false);
       }
     },
-    [filters, corpus]
+    [filters]
   );
 
   const handleLoadMore = useCallback(() => {
@@ -169,262 +154,201 @@ export default function Home() {
     }
   }, [results, isLoadingMore, query, doSearch]);
 
-  const handleCorpusChange = useCallback((newCorpus: Corpus) => {
-    setCorpus(newCorpus);
-    if (query) {
-      doSearch(query, 0);
-    }
-  }, [query, doSearch]);
-
-  useEffect(() => {
-    if (query) doSearch(query, 0);
-  }, [filters, corpus]);
-
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-[4.5rem] flex items-center gap-5">
-          {/* Logo */}
-          <div className="flex items-center gap-2.5 flex-shrink-0">
-            <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center shadow-sm">
-              <FileQuestion className="w-[18px] h-[18px] text-white" />
-            </div>
-            <span className="font-semibold text-[17px] text-slate-800 tracking-tight">Consensus</span>
-          </div>
+    <div className="min-h-screen bg-white flex">
+      {/* Left sidebar */}
+      <LeftSidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed((v) => !v)}
+      />
 
-          {/* Search */}
-          <div className="flex-1 max-w-3xl mx-auto">
-            <SearchBar onSearch={(q) => doSearch(q, 0)} isLoading={isLoading} />
-          </div>
-
-          {/* Mode toggle */}
-          <div className="flex-shrink-0">
-            <SearchModeToggle
-              initialMode={searchMode}
-              onModeChange={setSearchMode}
-            />
-          </div>
-
-          {/* Corpus toggle */}
-          <div className="flex-shrink-0">
-            <MedicalModeToggle onToggle={handleCorpusChange} />
-          </div>
-        </div>
-      </header>
-
-      {/* Main */}
-      <main className="max-w-7xl mx-auto px-6 py-6">
-        {query && results && (
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <p className="text-sm text-slate-500">
-                <span className="font-semibold text-slate-800">{results.total.toLocaleString()}</span> results for{" "}
-                <span className="font-medium text-slate-700">"{query}"</span>
-              </p>
-              {searchTime !== null && (
-                <span className="flex items-center gap-1 text-xs text-slate-400">
-                  <Clock className="w-3 h-3" />
-                  {searchTime < 1000 ? `${searchTime}ms` : `${(searchTime / 1000).toFixed(1)}s`}
-                </span>
-              )}
-            </div>
-            {corpus === "medical" && (
-              <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
-                Medical Mode
-              </Badge>
-            )}
+      {/* Main area */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Top right sign-up pill */}
+        {!query && (
+          <div className="absolute top-4 right-4 z-30">
+            <button className="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-full transition-colors shadow-sm">
+              Sign up
+            </button>
           </div>
         )}
 
-        <div className="flex gap-6">
-          {/* Sidebar */}
-          <div className="w-64 flex-shrink-0 space-y-3">
-            <SearchHistory onSearch={(q) => doSearch(q, 0)} />
-            <FilterSidebar
-              onFilterChange={setFilters}
-              totalResults={results?.total}
-              defaultStudyTypes={corpus === "medical" ? medicalDefaultStudyTypes : []}
-            />
-          </div>
-
-          {/* Results */}
-          <div className="flex-1 min-w-0">
-            {isLoading && (
-              <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse"
-                  >
-                    <div className="h-5 bg-slate-100 rounded w-3/4 mb-3" />
-                    <div className="h-3 bg-slate-100 rounded w-1/2 mb-4" />
-                    <div className="h-12 bg-slate-50 rounded mb-3" />
-                    <div className="h-3 bg-slate-100 rounded w-5/6" />
-                  </div>
-                ))}
+        {/* Centered content */}
+        <main className="flex-1 flex flex-col">
+          {!query ? (
+            // Landing page (no query yet)
+            <div className="flex-1 flex flex-col items-center justify-center px-8 pb-12">
+              {/* Logo + heading */}
+              <div className="flex items-center gap-2 mb-3">
+                <Logo size={28} />
+                <span className="font-semibold text-[15px] text-slate-800 tracking-tight">
+                  Consensus
+                </span>
               </div>
-            )}
+              <h1 className="text-3xl font-bold text-slate-900 mb-10 text-center">
+                Research starts here
+              </h1>
 
-            {error && (
-              <div className="text-center py-12 text-slate-500">
-                <p>{error}</p>
-                <button
-                  onClick={() => query && doSearch(query, 0)}
-                  className="mt-2 text-blue-600 hover:underline text-sm"
-                >
-                  Try again
-                </button>
-              </div>
-            )}
+              <HeroSearchBar onSearch={(q) => doSearch(q, 0)} isLoading={isLoading} />
 
-            {!isLoading && !error && results && results.papers.length === 0 && (
-              <div className="text-center py-16">
-                <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                  No papers found
-                </h3>
-                <p className="text-slate-500 text-sm">
-                  Try different keywords or remove some filters
-                </p>
-              </div>
-            )}
+              <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-slate-500">
+                The new standard for academic research
+              </p>
 
-            {!isLoading && results && results.papers.length > 0 && (
-              <>
-                <ConsensusSummary papers={results.papers} />
-
-                {/* Scholar Agent for Pro/Deep mode */}
-                {searchMode !== 'basic' && (
-                  <div className="mb-5 bg-white rounded-2xl border border-slate-200 p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-800">
-                          {searchMode === 'pro' ? 'Pro Scholar Agent' : 'Deep Scholar Agent'}
-                        </h3>
-                        <p className="text-xs text-slate-500">
-                          {searchMode === 'pro'
-                            ? `Analyzing top ${Math.min(20, results.papers.length)} papers with AI synthesis`
-                            : `Comprehensive analysis of all ${results.papers.length} papers`}
-                        </p>
-                      </div>
-                    </div>
-                    <ScholarAgent
-                      papers={results.papers}
-                      query={query}
-                      onPaperClick={(p) => setSelectedPaper(p as Paper & { aiFinding?: string })}
-                    />
-                  </div>
-                )}
-
-                <RelatedSearches
-                  query={query}
-                  papers={results.papers}
-                  onSearch={(q) => doSearch(q, 0)}
-                />
-                <ResultsTimeline
-                  papers={results.papers}
-                  onSelect={setSelectedPaper}
-                  selectedPaperId={selectedPaper?.paperId}
-                />
-                <div className="space-y-3">
-                  {results.papers.map((paper) => (
-                    <PaperCard
-                      key={paper.paperId}
-                      paper={paper}
-                      onSelect={setSelectedPaper}
-                    />
-                  ))}
-                </div>
-
-                {/* Load more button */}
-                {results.papers.length < results.total && (
-                  <div className="mt-6 flex justify-center">
-                    <Button
-                      onClick={handleLoadMore}
-                      disabled={isLoadingMore}
-                      variant="outline"
-                      className="px-8"
-                    >
-                      {isLoadingMore ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                          Loading...
-                        </>
-                      ) : (
-                        `Load more results`
-                      )}
-                    </Button>
-                  </div>
-                )}
-
-                {isLoadingMore && (
-                  <div className="space-y-3 mt-3">
-                    {[...Array(3)].map((_, i) => (
-                      <div
-                        key={`more-${i}`}
-                        className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse"
-                      >
-                        <div className="h-5 bg-slate-100 rounded w-3/4 mb-3" />
-                        <div className="h-3 bg-slate-100 rounded w-1/2 mb-4" />
-                        <div className="h-12 bg-slate-50 rounded mb-3" />
-                        <div className="h-3 bg-slate-100 rounded w-5/6" />
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Showing count */}
-                <div className="flex items-center justify-between mt-3">
-                  {results.papers.length < results.total && !isLoadingMore && (
-                    <p className="text-xs text-slate-400">
-                      Showing {results.papers.length} of {results.total.toLocaleString()} results
+              {/* Help button */}
+              <button
+                className="fixed bottom-6 right-6 w-9 h-9 rounded-full bg-white border border-slate-200 shadow-sm hover:shadow-md flex items-center justify-center text-slate-500 transition-all"
+                title="Help"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            // Results page
+            <div className="flex-1 px-8 py-6">
+              {results && (
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm text-slate-500">
+                      <span className="font-semibold text-slate-800">
+                        {results.total.toLocaleString()}
+                      </span>{" "}
+                      results for{" "}
+                      <span className="font-medium text-slate-700">"{query}"</span>
                     </p>
-                  )}
-                  {query && (
-                    <button
-                      onClick={() => toggleSaveSearch(query)}
-                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full transition-colors ml-auto ${
-                        isCurrentSaved
-                          ? 'bg-blue-100 text-blue-600'
-                          : 'bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600'
-                      }`}
-                    >
-                      <Bookmark className={`w-3.5 h-3.5 ${isCurrentSaved ? 'fill-current' : ''}`} />
-                      {isCurrentSaved ? 'Saved' : 'Save search'}
-                    </button>
-                  )}
+                    {searchTime !== null && (
+                      <span className="flex items-center gap-1 text-xs text-slate-400">
+                        <Clock className="w-3 h-3" />
+                        {searchTime < 1000 ? `${searchTime}ms` : `${(searchTime / 1000).toFixed(1)}s`}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </>
-            )}
+              )}
 
-            {!isLoading && !query && !results && (
-              <div className="text-center py-20">
-                <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                  <Search className="w-8 h-8 text-blue-400" />
+              <div className="flex gap-6">
+                {/* Sidebar */}
+                <div className="w-64 flex-shrink-0 space-y-3">
+                  <SearchHistory onSearch={(q) => doSearch(q, 0)} />
+                  <FilterSidebar
+                    onFilterChange={setFilters}
+                    totalResults={results?.total}
+                  />
                 </div>
-                <h2 className="text-xl font-bold text-slate-800 mb-2">
-                  Ask anything. Get research answers.
-                </h2>
-                <p className="text-slate-500 text-sm max-w-sm mx-auto">
-                  Type a question above to search across 200M+ academic papers and see the consensus of the research.
-                </p>
+
+                {/* Results */}
+                <div className="flex-1 min-w-0">
+                  {isLoading && (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse"
+                        >
+                          <div className="h-5 bg-slate-100 rounded w-3/4 mb-3" />
+                          <div className="h-3 bg-slate-100 rounded w-1/2 mb-4" />
+                          <div className="h-12 bg-slate-50 rounded mb-3" />
+                          <div className="h-3 bg-slate-100 rounded w-5/6" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="text-center py-12 text-slate-500">
+                      <p>{error}</p>
+                      <button
+                        onClick={() => query && doSearch(query, 0)}
+                        className="mt-2 text-cyan-600 hover:underline text-sm"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
+
+                  {!isLoading && !error && results && results.papers.length === 0 && (
+                    <div className="text-center py-16">
+                      <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-slate-700 mb-2">
+                        No papers found
+                      </h3>
+                      <p className="text-slate-500 text-sm">
+                        Try different keywords or remove some filters
+                      </p>
+                    </div>
+                  )}
+
+                  {!isLoading && results && results.papers.length > 0 && (
+                    <>
+                      <ConsensusSummary papers={results.papers} />
+
+                      <div className="space-y-3">
+                        {results.papers.map((paper) => (
+                          <PaperCard
+                            key={paper.paperId}
+                            paper={paper}
+                            onSelect={setSelectedPaper}
+                          />
+                        ))}
+                      </div>
+
+                      {results.papers.length < results.total && (
+                        <div className="mt-6 flex justify-center">
+                          <Button
+                            onClick={handleLoadMore}
+                            disabled={isLoadingMore}
+                            variant="outline"
+                            className="px-8"
+                          >
+                            {isLoadingMore ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Loading...
+                              </>
+                            ) : (
+                              "Load more results"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mt-3">
+                        {results.papers.length < results.total && !isLoadingMore && (
+                          <p className="text-xs text-slate-400">
+                            Showing {results.papers.length} of{" "}
+                            {results.total.toLocaleString()} results
+                          </p>
+                        )}
+                        {query && (
+                          <button
+                            onClick={() => toggleSaveSearch(query)}
+                            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full transition-colors ml-auto ${
+                              isCurrentSaved
+                                ? "bg-cyan-100 text-cyan-600"
+                                : "bg-slate-100 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600"
+                            }`}
+                          >
+                            <Bookmark className={`w-3.5 h-3.5 ${isCurrentSaved ? "fill-current" : ""}`} />
+                            {isCurrentSaved ? "Saved" : "Save search"}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      </main>
+            </div>
+          )}
+        </main>
 
-      {/* Enhanced paper detail panel */}
-      {selectedPaper && (
-        <EnhancedPaperDetailPanel
-          paper={selectedPaper}
-          onClose={() => setSelectedPaper(null)}
-        />
-      )}
+        {/* Paper detail panel */}
+        {selectedPaper && (
+          <EnhancedPaperDetailPanel
+            paper={selectedPaper}
+            onClose={() => setSelectedPaper(null)}
+          />
+        )}
+      </div>
     </div>
   );
 }
