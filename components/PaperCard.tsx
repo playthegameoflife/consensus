@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Paper } from '@/lib/types'
 import { getStudyType, formatAuthors } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -185,6 +185,118 @@ const TOP_JOURNALS = new Set([
   "Nature Reviews Molecular Cell Biology",
 ]);
 
+interface StudySnapshotData {
+  population?: string;
+  sampleSize?: string;
+  methods?: string;
+  duration?: string;
+}
+
+/** Extract structured metadata from abstract using regex patterns (no LLM). */
+function extractStudySnapshot(abstract: string): StudySnapshotData {
+  if (!abstract) return {};
+
+  const data: StudySnapshotData = {};
+
+  // Population: "N participants/patients/subjects/adults/children/men/women" or "X Y participants"
+  const popPatterns = [
+    /(\d[\d,]*)\s*(participants|patients|subjects|adults|children|men|women|subjects|individuals|volunteers|recruits)/i,
+    /(participants|patients|subjects|adults|children|men|women|subjects|individuals|volunteers)\s*(?:aged|aged|in\s+this|who|that|were|was|\d)/i,
+  ];
+  for (const re of popPatterns) {
+    const m = abstract.match(re);
+    if (m) {
+      data.population = m[0].trim();
+      break;
+    }
+  }
+
+  // Sample size: "n=NNN", "N=NNN", "sample of NNN", "NNN participants"
+  const samplePatterns = [
+    /[nN]\s*=\s*(\d[\d,]*)/,
+    /sample\s+of\s+(\d[\d,]*)/i,
+    /(\d[\d,]+)\s+(participants|patients|subjects|individuals)/i,
+  ];
+  for (const re of samplePatterns) {
+    const m = abstract.match(re);
+    if (m) {
+      data.sampleSize = `n=${m[1].replace(/,/g, '')}`;
+      break;
+    }
+  }
+
+  // Methods: look for study design keywords
+  const methodsPatterns = [
+    /\b(meta-analysis|meta analysis)\b/i,
+    /\b(systematic\s+review)\b/i,
+    /\b(randomized\s+(controlled\s+)?trial|randomised\s+(controlled\s+)?trial)\b/i,
+    /\b(double-blind|double\s+blind|double-blinded)\b/i,
+    /\b(cohort\s+study|prospective\s+cohort|retrospective\s+cohort)\b/i,
+    /\b(longitudinal\s+study|longitudinal)\b/i,
+    /\b(cross-sectional|cross\s+sectional)\b/i,
+    /\b(case-control|case\s+control)\b/i,
+    /\b(crossover)\b/i,
+    /\b(observational)\b/i,
+  ];
+  for (const re of methodsPatterns) {
+    const m = abstract.match(re);
+    if (m) {
+      data.methods = m[0].trim();
+      break;
+    }
+  }
+
+  // Duration: "X weeks/months/years" near study-related words
+  const durationPatterns = [
+    /\b(\d+[\-–]?\d*)\s*(weeks?|months?|years?|days?)\s*(follow-up|duration|period|trial|study)?/i,
+    /\b(?:over|for|during|lasting)\s+(\d+[\-–]?\d*)\s*(weeks?|months?|years?|days?)/i,
+  ];
+  for (const re of durationPatterns) {
+    const m = abstract.match(re);
+    if (m) {
+      data.duration = m[0].trim();
+      break;
+    }
+  }
+
+  return data;
+}
+
+function StudySnapshot({ abstract }: { abstract?: string }) {
+  const snapshot = useMemo(() => extractStudySnapshot(abstract || ''), [abstract]);
+
+  const pills: { label: string; value: string; color: string }[] = [];
+  if (snapshot.population) {
+    pills.push({ label: 'Population', value: snapshot.population, color: 'bg-blue-50 text-blue-700' });
+  }
+  if (snapshot.sampleSize) {
+    pills.push({ label: 'n=', value: snapshot.sampleSize.replace('n=', ''), color: 'bg-emerald-50 text-emerald-700' });
+  }
+  if (snapshot.methods) {
+    pills.push({ label: 'Methods', value: snapshot.methods, color: 'bg-purple-50 text-purple-700' });
+  }
+  if (snapshot.duration) {
+    pills.push({ label: 'Duration', value: snapshot.duration, color: 'bg-amber-50 text-amber-700' });
+  }
+
+  if (pills.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {pills.map((p) => (
+        <span
+          key={p.label}
+          className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium ${p.color}`}
+          title={p.label}
+        >
+          <span className="opacity-60">{p.label}</span>
+          <span>{p.value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function PaperCard({ paper, onSelect }: PaperCardProps) {
   const studyType = getStudyType(paper)
   const colorClass = STUDY_COLORS[studyType] || STUDY_COLORS.Study
@@ -277,6 +389,9 @@ export function PaperCard({ paper, onSelect }: PaperCardProps) {
             {paper.abstract}
           </p>
         )}
+
+        {/* Study Snapshot badges */}
+        <StudySnapshot abstract={paper.abstract} />
       </div>
 
       {/* Links */}

@@ -12,6 +12,7 @@ import { SearchHistory, addToHistory } from "@/components/SearchHistory";
 import { Corpus as CorpusType } from "@/components/MedicalModeToggle";
 import { SearchMode as SearchModeType } from "@/components/SearchModeToggle";
 import { HeroSearchBar } from "@/components/HeroSearchBar";
+import { ProAnalysisBlock } from "@/components/ProAnalysisBlock";
 import { Paper } from "@/lib/types";
 import { Loader2, Search, ArrowUp, ArrowDown, Minus, Clock, Bookmark, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -403,6 +404,10 @@ export default function Home() {
 
                   {!isLoading && results && results.papers.length > 0 && (
                     <>
+                      <ProAnalysisBlock
+                        query={query}
+                        enabled={searchMode === "deep"}
+                      />
                       <ConsensusSummary papers={results.papers} />
 
                       <div className="space-y-3">
