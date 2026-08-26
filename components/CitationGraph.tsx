@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Maximize2 } from "lucide-react";
 import { Paper } from "@/lib/types";
+import { getCitations, getReferences } from "@/lib/openalex";
 
 interface GraphNode {
   id: string;
@@ -159,30 +160,24 @@ export function CitationGraph({ paper, onNodeClick }: CitationGraphProps) {
   useEffect(() => {
     setIsLoading(true);
     Promise.all([
-      fetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paper.paperId}/citations?fields=title,year,citationCount&limit=8`
-      ).then((r) => r.json()),
-      fetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paper.paperId}/references?fields=title,year,citationCount&limit=8`
-      ).then((r) => r.json()),
+      getCitations(paper.paperId, 8).then((cites) =>
+        cites.map((c) => ({
+          paperId: c.paperId,
+          title: c.title,
+          year: c.year,
+          citationCount: 0,
+        }))
+      ),
+      getReferences(paper.paperId, 8).then((refs) =>
+        refs.map((r) => ({
+          paperId: r.paperId,
+          title: r.title,
+          year: r.year,
+          citationCount: 0,
+        }))
+      ),
     ])
-      .then(([citingData, refData]) => {
-        const citing: typeof citingPapers = (citingData.data || []).map(
-          (d: { paperId: string; title: string; year?: number; citationCount: number }) => ({
-            paperId: d.paperId,
-            title: d.title,
-            year: d.year,
-            citationCount: d.citationCount || 0,
-          })
-        );
-        const refs: typeof referencePapers = (refData.data || []).map(
-          (d: { paperId: string; title: string; year?: number; citationCount: number }) => ({
-            paperId: d.paperId,
-            title: d.title,
-            year: d.year,
-            citationCount: d.citationCount || 0,
-          })
-        );
+      .then(([citing, refs]) => {
         setCitingPapers(citing);
         setReferencePapers(refs);
 

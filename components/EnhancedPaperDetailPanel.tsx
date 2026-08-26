@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Paper } from "@/lib/types";
 import { formatAuthors } from "@/lib/utils";
+import { getCitations, getReferences, getRelatedPapers } from "@/lib/openalex";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -103,26 +104,16 @@ export function EnhancedPaperDetailPanel({
   useEffect(() => {
     if (activeTab === "citations" && citations.length === 0) {
       setIsLoadingCitations(true);
-      fetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paper.paperId}/citations?fields=title,authors,year&limit=10`
-      )
-        .then((r) => r.json())
-        .then((data) => {
-          setCitations(data.data || []);
-        })
+      getCitations(paper.paperId, 10)
+        .then(setCitations)
         .catch(() => setCitations([]))
         .finally(() => setIsLoadingCitations(false));
     }
 
     if (activeTab === "related" && relatedPapers.length === 0) {
       setIsLoadingRelated(true);
-      fetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paper.paperId}/recommendations?fields=title,authors,year,fieldsOfStudy&limit=10`
-      )
-        .then((r) => r.json())
-        .then((data) => {
-          setRelatedPapers(data.data || []);
-        })
+      getRelatedPapers(paper.paperId, 10)
+        .then(setRelatedPapers)
         .catch(() => setRelatedPapers([]))
         .finally(() => setIsLoadingRelated(false));
     }
@@ -131,14 +122,11 @@ export function EnhancedPaperDetailPanel({
   // Fetch references for Claims tab
   useEffect(() => {
     if (activeTab === "claims" && references.length === 0) {
-      fetch(
-        `https://api.semanticscholar.org/graph/v1/paper/${paper.paperId}/references?fields=title,authors,year&limit=20`
-      )
-        .then((r) => r.json())
-        .then((data) => {
-          setReferences(data.data || []);
-        })
-        .catch(() => setReferences([]));
+      setIsLoadingRelated(true);
+      getReferences(paper.paperId, 20)
+        .then(setReferences)
+        .catch(() => setReferences([]))
+        .finally(() => setIsLoadingRelated(false));
     }
   }, [activeTab, paper.paperId, references.length]);
 

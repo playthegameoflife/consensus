@@ -5,65 +5,17 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import {
+  searchPapers as openalexSearch,
+  getPaper as openalexGetPaper,
+  autocomplete as openalexAutocomplete,
+  getCitations as openalexGetCitations,
+  reconstructAbstract,
+} from "../lib/openalex.js";
+import { extractAIFinding } from "../lib/llm.js";
+import type { Paper } from "../lib/types.js";
 
-// ─── Semantic Scholar API types ────────────────────────────────────────────────
-
-interface Author {
-  authorId: string;
-  name: string;
-}
-
-interface Paper {
-  paperId: string;
-  title: string;
-  authors: Author[];
-  abstract?: string;
-  year: number;
-  journal?: string;
-  citationCount: number;
-  doi?: string;
-  externalIds?: {
-    DOI?: string;
-    ArXiv?: string;
-  };
-  publicationTypes?: string[];
-  openAccessPdf?: {
-    url: string;
-  };
-  fieldsOfStudy?: string[];
-}
-
-interface SearchResult {
-  papers: Paper[];
-  total: number;
-  offset: number;
-}
-
-// ─── API helpers ───────────────────────────────────────────────────────────────
-
-const SEMANTIC_SCHOLAR_BASE = "https://api.semanticscholar.org/graph/v1";
-
-const PAPER_FIELDS = [
-  "paperId",
-  "title",
-  "authors",
-  "abstract",
-  "year",
-  "journal",
-  "citationCount",
-  "doi",
-  "externalIds",
-  "publicationTypes",
-  "openAccessPdf",
-  "fieldsOfStudy",
-].join(",");
-
-function getSemScholarHeaders(): HeadersInit {
-  const headers: HeadersInit = { Accept: "application/json" };
-  const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY;
-  if (apiKey) headers["x-api-key"] = apiKey;
-  return headers;
-}
+// ─── Re-export shared OpenAlex-backed client ──────────────────────────────────
 
 async function searchPapers(
   query: string,
@@ -71,138 +23,34 @@ async function searchPapers(
   yearFrom?: number,
   yearTo?: number,
   openAccessOnly?: boolean
-): Promise<SearchResult> {
-  const params = new URLSearchParams({
-    query,
-    offset: "0",
-    limit: String(limit),
-    fields: PAPER_FIELDS,
-  });
-
+) {
+  const filters: Parameters<typeof openalexSearch>[3] = {};
   if (yearFrom || yearTo) {
-    const start = yearFrom ?? 0;
-    const end = yearTo ?? 9999;
-    params.set("year", `${start}-${end}`);
+    filters.yearRange = [yearFrom ?? 0, yearTo ?? new Date().getFullYear()];
   }
-
-  if (openAccessOnly) {
-    params.set("openAccessPdf", "true");
-  }
-
-  const res = await fetch(
-    `${SEMANTIC_SCHOLAR_BASE}/paper/search?${params}`,
-    { headers: getSemScholarHeaders() }
-  );
-
-  if (!res.ok) {
-    throw new Error(`Semantic Scholar search error ${res.status}: ${await res.text()}`);
-  }
-
-  return res.json() as Promise<SearchResult>;
+  if (openAccessOnly) filters.openAccessOnly = true;
+  return openalexSearch(query, 0, limit, filters);
 }
 
 async function getPaperDetails(paperId: string): Promise<Paper> {
-  const res = await fetch(
-    `${SEMANTIC_SCHOLAR_BASE}/paper/${paperId}?fields=${PAPER_FIELDS}`,
-    { headers: getSemScholarHeaders() }
-  );
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch paper ${paperId}: ${res.status}`);
-  }
-
-  return res.json() as Promise<Paper>;
+  return openalexGetPaper(paperId);
 }
 
-async function getPaperCitations(
-  paperId: string,
-  limit = 10
-): Promise<Paper[]> {
-  const params = new URLSearchParams({
-    "fields[0]": "paperId",
-    "fields[1]": "title",
-    "fields[2]": "authors",
-    "fields[3]": "year",
-    "fields[4]": "journal",
-    "fields[5]": "citationCount",
-    limit: String(limit),
-  });
-
-  const res = await fetch(
-    `${SEMANTIC_SCHOLAR_BASE}/paper/${paperId}/citations?${params}`,
-    { headers: getSemScholarHeaders() }
-  );
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch citations for ${paperId}: ${res.status}`);
-  }
-
-  const data = (await res.json()) as { data: Array<{ citingPaper: Paper }> };
-  return data.data.map((c) => c.citingPaper);
+async function getPaperCitations(paperId: string, limit = 10): Promise<Paper[]> {
+  const cites = await openalexGetCitations(paperId, limit);
+  // MCP consumers expect full Paper[] — fetch metadata per ID
+  return Promise.all(cites.map((c) => openalexGetPaper(c.paperId).catch(() => null as unknown as Paper))).then((arr) => arr.filter(Boolean));
 }
 
 async function getAutocomplete(query: string): Promise<string[]> {
-  const params = new URLSearchParams({ query });
-  const res = await fetch(
-    `${SEMANTIC_SCHOLAR_BASE}/paper/suggest?${params}`,
-    { headers: getSemScholarHeaders() }
-  );
-
-  if (!res.ok) return [];
-  const data = (await res.json()) as { suggestions?: string[] };
-  return (data.suggestions || []).slice(0, 5);
+  return openalexAutocomplete(query);
 }
+
+// Suppress unused import warning while keeping the shared client
+void reconstructAbstract;
 
 // ─── LLM enhancement ─────────────────────────────────────────────────────────
-
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-
-async function extractAIFinding(paper: Paper, query: string): Promise<string | undefined> {
-  if (!GROQ_API_KEY) {
-    return paper.abstract?.slice(0, 200) + "...";
-  }
-
-  const abstract = paper.abstract || "No abstract available.";
-  const prompt = `You are a research assistant. Given a research paper abstract and a user query, extract the ONE key finding most relevant to the query.
-
-Query: "${query}"
-
-Abstract:
-${abstract}
-
-Respond with ONLY the key finding in 1-2 sentences. Be specific and quantitative when possible. If the paper is not relevant to the query, say "This paper may not directly address the query."`;
-
-  try {
-    const res = await fetch(GROQ_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful research assistant. Extract key findings from academic papers.",
-          },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 150,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!res.ok) return undefined;
-    const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
-    };
-    return data.choices?.[0]?.message?.content?.trim();
-  } catch {
-    return undefined;
-  }
-}
+// extractAIFinding is imported from lib/llm.js above — no local copy needed.
 
 // ─── MCP Server ──────────────────────────────────────────────────────────────
 
@@ -216,11 +64,11 @@ const SearchPapersSchema = z.object({
 });
 
 const GetPaperSchema = z.object({
-  paper_id: z.string().describe("Semantic Scholar paper ID"),
+  paper_id: z.string().describe("OpenAlex Work ID (e.g. W3013463190)"),
 });
 
 const GetPaperCitationsSchema = z.object({
-  paper_id: z.string().describe("Semantic Scholar paper ID"),
+  paper_id: z.string().describe("OpenAlex Work ID (e.g. W3013463190)"),
   limit: z.number().optional().default(10).describe("Max citations"),
 });
 
@@ -279,13 +127,13 @@ async function main() {
         {
           name: "get_paper",
           description:
-            "Get full details of a specific paper by its Semantic Scholar ID.",
+            "Get full details of a specific paper by its OpenAlex Work ID.",
           inputSchema: {
             type: "object",
             properties: {
               paper_id: {
                 type: "string",
-                description: "Semantic Scholar paper ID",
+                description: "OpenAlex Work ID (e.g. W3013463190)",
               },
             },
             required: ["paper_id"],
@@ -299,7 +147,7 @@ async function main() {
             properties: {
               paper_id: {
                 type: "string",
-                description: "Semantic Scholar paper ID",
+                description: "OpenAlex Work ID (e.g. W3013463190)",
               },
               limit: {
                 type: "number",

@@ -136,18 +136,20 @@ function SaveButton({ paperId, saved }: { paperId: string; saved: boolean }) {
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger className="absolute top-3 right-3">
-        <button
-          onClick={e => e.stopPropagation()}
-          className={`p-1.5 rounded-lg transition-all ${
+      <DropdownMenuTrigger
+        className="absolute top-3 right-3 p-1.5 rounded-lg transition-all data-[state=open]:opacity-100"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Bookmark
+          className={`w-4 h-4 ${
             saved
-              ? 'bg-blue-50 text-blue-500'
-              : 'opacity-0 group-hover:opacity-100 bg-slate-100 text-slate-400 hover:text-blue-500'
+              ? "fill-current text-blue-500"
+              : "opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500"
           }`}
-          title={saved ? 'Saved to collection' : 'Save to collection'}
-        >
-          <Bookmark className={`w-4 h-4 ${saved ? 'fill-current' : ''}`} />
-        </button>
+        />
+        <span className="sr-only">
+          {saved ? "Saved to collection" : "Save to collection"}
+        </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={4} className="p-0 overflow-hidden z-[9999]">
         <CollectionPicker paperId={paperId} onClose={() => setOpen(false)} />

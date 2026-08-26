@@ -1,0 +1,439 @@
+/**
+ * OpenAlex API client — consensus.app's data source.
+ *
+ * Docs: https://developers.openalex.org/api-reference/works
+ * No auth required for polite pool. We send a User-Agent per their etiquette:
+ *   https://docs.openalex.org/how-to-use-the-api/rate-limits-and-authentication
+ */
+
+const BASE_URL = "https://api.openalex.org";
+const MAILTO = process.env.OPENALEX_MAILTO || "hello@consensus-clone.app";
+
+const WORK_FIELDS = [
+  "id",
+  "doi",
+  "title",
+  "abstract_inverted_index",
+  "publication_year",
+  "publication_date",
+  "authorships",
+  "primary_location",
+  "cited_by_count",
+  "open_access",
+  "type",
+  "language",
+  "ids",
+  "concepts",
+].join(",");
+
+interface RawAuthor {
+  author?: { id?: string; display_name?: string; orcid?: string };
+}
+
+interface RawLocation {
+  source?: { display_name?: string } | null;
+  license?: { url?: string } | null;
+}
+
+interface RawWork {
+  id: string;
+  doi?: string | null;
+  title?: string | null;
+  abstract_inverted_index?: Record<string, number[]> | null;
+  publication_year?: number | null;
+  publication_date?: string | null;
+  authorships?: RawAuthor[];
+  primary_location?: RawLocation | null;
+  cited_by_count?: number | null;
+  open_access?: {
+    is_oa?: boolean;
+    oa_status?: string;
+    oa_url?: string | null;
+  };
+  type?: string | null;
+  language?: string | null;
+  ids?: {
+    doi?: string;
+    pmid?: string;
+    pmcid?: string;
+    mag?: string;
+    openalex?: string;
+  };
+  concepts?: Array<{ display_name?: string; score?: number }>;
+}
+
+interface RawSearchResponse {
+  meta: { count: number };
+  results: RawWork[];
+}
+
+/** Reconstruct abstract from inverted index: { word: [pos1, pos2] } → string. */
+export function reconstructAbstract(
+  invertedIndex: Record<string, number[]> | null | undefined
+): string | undefined {
+  if (!invertedIndex || typeof invertedIndex !== "object") return undefined;
+  const positions: Array<{ word: string; pos: number }> = [];
+  for (const [word, idxs] of Object.entries(invertedIndex)) {
+    if (!Array.isArray(idxs)) continue;
+    for (const pos of idxs) {
+      if (typeof pos === "number") positions.push({ word, pos });
+    }
+  }
+  if (positions.length === 0) return undefined;
+  positions.sort((a, b) => a.pos - b.pos);
+  return positions.map((p) => p.word).join(" ");
+}
+
+/** Map OpenAlex type / source to a consensus.app-style study-type label. */
+function inferStudyType(work: RawWork): string {
+  // OpenAlex `type` is one of: article, review, book-chapter, dissertation,
+  // paratext, dataset, letter, editorial, erratum, book, lib-genre,
+  // reference-entry, report, standard, other
+  const type = work.type || "";
+  const venue = work.primary_location?.source?.display_name || "";
+  const title = work.title?.toLowerCase() || "";
+  const venueLower = venue.toLowerCase();
+
+  // Heuristics — consensus.app uses similar pattern (RCT, Meta-Analysis, etc.)
+  if (title.includes("meta-analysis") || title.includes("meta analysis")) return "Meta-Analysis";
+  if (title.includes("systematic review")) return "Systematic Review";
+  if (type === "review") return "Review";
+  if (
+    title.includes("randomized controlled trial") ||
+    title.includes("randomised controlled trial") ||
+    title.includes(" rct ")
+  )
+    return "RCT";
+  if (title.includes("clinical trial")) return "Clinical Trial";
+  if (type === "dissertation") return "Dissertation";
+  if (type === "dataset") return "Dataset";
+  if (type === "book-chapter" || type === "book") return "Book";
+  if (type === "report") return "Report";
+  if (type === "editorial") return "Editorial";
+  if (type === "letter") return "Letter";
+
+  // Fallback: top concept
+  const topConcept = work.concepts?.[0]?.display_name;
+  return topConcept || "Study";
+}
+
+function mapWork(work: RawWork): import("./types").Paper {
+  const paperId = work.id?.startsWith("https://openalex.org/")
+    ? work.id.replace("https://openalex.org/", "")
+    : work.id;
+
+  const rawDoi =
+    work.doi ||
+    (work.ids?.doi ? `https://doi.org/${work.ids.doi}` : undefined) ||
+    undefined;
+  const cleanDoi = rawDoi?.replace(/^https?:\/\/(?:dx\.)?doi\.org\//, "");
+
+  // ArXiv ID can come from external_ids (we'd need that field) or DOI prefix "10.48550/arXiv."
+  let arxivId: string | undefined;
+  if (cleanDoi?.startsWith("10.48550/arXiv.")) {
+    arxivId = cleanDoi.replace("10.48550/arXiv.", "");
+  }
+
+  const authors =
+    work.authorships?.map((a) => ({
+      authorId: a.author?.id?.replace("https://openalex.org/", ""),
+      name: a.author?.display_name || "Unknown",
+      orcid: a.author?.orcid?.replace("https://orcid.org/", ""),
+    })) || [];
+
+  const fieldsOfStudy =
+    work.concepts?.slice(0, 3).map((c) => c.display_name).filter(Boolean) as
+      | string[]
+      | undefined;
+
+  return {
+    paperId,
+    title: work.title || "Untitled",
+    authors,
+    abstract: reconstructAbstract(work.abstract_inverted_index),
+    year: work.publication_year || 0,
+    journal: work.primary_location?.source?.display_name || undefined,
+    citationCount: work.cited_by_count || 0,
+    doi: cleanDoi,
+    externalIds: {
+      DOI: cleanDoi,
+      ArXiv: arxivId,
+      PMID: work.ids?.pmid,
+      PMC: work.ids?.pmcid,
+      MAG: work.ids?.mag,
+    },
+    publicationTypes: work.type ? [work.type] : [],
+    openAccessPdf: work.open_access?.oa_url
+      ? { url: work.open_access.oa_url }
+      : undefined,
+    openAccessStatus: work.open_access?.oa_status,
+    fieldsOfStudy,
+    language: work.language || undefined,
+  };
+}
+
+export async function searchPapers(
+  query: string,
+  offset = 0,
+  limit = 10,
+  filters?: import("./types").SearchFilters
+): Promise<import("./types").SearchResult> {
+  const params = new URLSearchParams({
+    search: query,
+    page: String(Math.floor(offset / limit) + 1),
+    per_page: String(limit),
+    select: WORK_FIELDS,
+    mailto: MAILTO,
+  });
+
+  // Year range filter: "from_date" / "until_date" use YYYY-MM-DD
+  if (filters?.yearRange) {
+    const [start, end] = filters.yearRange;
+    params.set(
+      "filter",
+      `publication_year:${start}-${end}${
+        filters.openAccessOnly ? ",open_access.is_oa:true" : ""
+      }`
+    );
+  } else if (filters?.openAccessOnly) {
+    params.set("filter", "open_access.is_oa:true");
+  }
+  if (filters?.year) {
+    params.append("filter", `publication_year:${filters.year}`);
+  }
+  if (filters?.corpus === "medical") {
+    // consensus.app Medical mode = top-tier medical journals. OpenAlex doesn't
+    // have a built-in tier list, but we can scope to top medical concepts.
+    params.append(
+      "filter",
+      "concepts.id:C2778864810|C2996394920|C121332964|C70726800|C118543170|C524330487|C86800640"
+    );
+  }
+
+  // Sort: relevance (default), newest → publication_date:desc, cited → cited_by_count:desc
+  if (filters?.sort === "newest") params.set("sort", "publication_date:desc");
+  else if (filters?.sort === "cited")
+    params.set("sort", "cited_by_count:desc");
+
+  const res = await fetch(`${BASE_URL}/works?${params}`, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": `consensus-clone (mailto:${MAILTO})`,
+    },
+    next: { revalidate: 3600 },
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`OpenAlex API error ${res.status}: ${errorText}`);
+  }
+
+  const data = (await res.json()) as RawSearchResponse;
+  return {
+    papers: data.results.map(mapWork),
+    total: data.meta?.count || 0,
+    offset,
+  };
+}
+
+export async function getPaper(paperId: string): Promise<import("./types").Paper> {
+  // Accept both raw OpenAlex ID ("W123") and full URL
+  const id = paperId.startsWith("https://openalex.org/")
+    ? paperId
+    : `https://openalex.org/${paperId}`;
+
+  const params = new URLSearchParams({
+    select: WORK_FIELDS,
+    mailto: MAILTO,
+  });
+
+  const res = await fetch(`${BASE_URL}/works/${id}?${params}`, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": `consensus-clone (mailto:${MAILTO})`,
+    },
+    next: { revalidate: 86400 },
+  });
+
+  if (!res.ok) throw new Error(`Failed to fetch paper: ${res.status}`);
+  const data = (await res.json()) as RawWork;
+  return mapWork(data);
+}
+
+/**
+ * Autocomplete — OpenAlex has no native autocomplete endpoint. consensus.app
+ * uses its own concept index for this; we mimic it by returning top works'
+ * titles and concepts whose tokens begin with the query.
+ */
+export async function autocomplete(query: string): Promise<string[]> {
+  if (!query || query.length < 2) return [];
+
+  const params = new URLSearchParams({
+    search: query,
+    per_page: "5",
+    select: "title,concepts",
+    mailto: MAILTO,
+  });
+
+  try {
+    const res = await fetch(`${BASE_URL}/works?${params}`, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": `consensus-clone (mailto:${MAILTO})`,
+      },
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      results?: Array<{ title?: string | null; concepts?: Array<{ display_name?: string }> }>;
+    };
+    const titles = (data.results || [])
+      .map((r) => r.title)
+      .filter((t): t is string => !!t && t.length > 0)
+      .slice(0, 5);
+    return titles;
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch works that cite a given work. */
+export async function getCitations(
+  paperId: string,
+  limit = 10
+): Promise<Array<{ paperId: string; title: string; year?: number; authors?: Array<{ name: string }> }>> {
+  const params = new URLSearchParams({
+    filter: `cites:${paperId.startsWith("W") ? `https://openalex.org/${paperId}` : paperId}`,
+    per_page: String(limit),
+    select: "id,title,publication_year,authorships",
+    mailto: MAILTO,
+  });
+
+  try {
+    const res = await fetch(`${BASE_URL}/works?${params}`, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": `consensus-clone (mailto:${MAILTO})`,
+      },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { results?: RawWork[] };
+    return (data.results || []).map((w) => ({
+      paperId: w.id?.replace("https://openalex.org/", "") || "",
+      title: w.title || "",
+      year: w.publication_year || undefined,
+      authors:
+        w.authorships?.map((a) => ({
+          name: a.author?.display_name || "Unknown",
+        })) || [],
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch works referenced by a given work. */
+export async function getReferences(
+  paperId: string,
+  limit = 20
+): Promise<Array<{ paperId: string; title: string; year?: number; authors?: Array<{ name: string }> }>> {
+  const id = paperId.startsWith("W") ? `https://openalex.org/${paperId}` : paperId;
+
+  try {
+    // Fetch the work's referenced_works list
+    const params = new URLSearchParams({ select: "referenced_works", mailto: MAILTO });
+    const res = await fetch(`${BASE_URL}/works/${id}?${params}`, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": `consensus-clone (mailto:${MAILTO})`,
+      },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { referenced_works?: string[] };
+    const refs = (data.referenced_works || []).slice(0, limit);
+    if (refs.length === 0) return [];
+
+    // Bulk-fetch their metadata
+    const filterValue = refs.map((r) => r.replace("https://openalex.org/", "")).join("|");
+    const metaRes = await fetch(
+      `${BASE_URL}/works?${new URLSearchParams({
+        filter: `openalex_id:${filterValue}`,
+        per_page: String(refs.length),
+        select: "id,title,publication_year,authorships",
+        mailto: MAILTO,
+      })}`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": `consensus-clone (mailto:${MAILTO})`,
+        },
+      }
+    );
+    if (!metaRes.ok) return [];
+    const metaData = (await metaRes.json()) as { results?: RawWork[] };
+    return (metaData.results || []).map((w) => ({
+      paperId: w.id?.replace("https://openalex.org/", "") || "",
+      title: w.title || "",
+      year: w.publication_year || undefined,
+      authors:
+        w.authorships?.map((a) => ({
+          name: a.author?.display_name || "Unknown",
+        })) || [],
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/** Fetch related papers (OpenAlex "related works"). */
+export async function getRelatedPapers(
+  paperId: string,
+  limit = 10
+): Promise<Array<{ paperId: string; title: string; year?: number; authors?: Array<{ name: string }>; fieldsOfStudy?: string[] }>> {
+  const id = paperId.startsWith("W") ? `https://openalex.org/${paperId}` : paperId;
+
+  try {
+    const params = new URLSearchParams({ select: "related_works", mailto: MAILTO });
+    const res = await fetch(`${BASE_URL}/works/${id}?${params}`, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": `consensus-clone (mailto:${MAILTO})`,
+      },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { related_works?: string[] };
+    const related = (data.related_works || []).slice(0, limit);
+    if (related.length === 0) return [];
+
+    const filterValue = related.map((r) => r.replace("https://openalex.org/", "")).join("|");
+    const metaRes = await fetch(
+      `${BASE_URL}/works?${new URLSearchParams({
+        filter: `openalex_id:${filterValue}`,
+        per_page: String(related.length),
+        select: "id,title,publication_year,authorships,concepts",
+        mailto: MAILTO,
+      })}`,
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": `consensus-clone (mailto:${MAILTO})`,
+        },
+      }
+    );
+    if (!metaRes.ok) return [];
+    const metaData = (await metaRes.json()) as { results?: RawWork[] };
+    return (metaData.results || []).map((w) => ({
+      paperId: w.id?.replace("https://openalex.org/", "") || "",
+      title: w.title || "",
+      year: w.publication_year || undefined,
+      authors:
+        w.authorships?.map((a) => ({
+          name: a.author?.display_name || "Unknown",
+        })) || [],
+      fieldsOfStudy:
+        w.concepts?.slice(0, 3).map((c) => c.display_name).filter(Boolean) as string[] | undefined,
+    }));
+  } catch {
+    return [];
+  }
+}

@@ -1,8 +1,8 @@
 import { Paper } from "./types";
 
 /**
- * Fetch PDF for a paper using arXiv ID or DOI
- * Returns Buffer or null if no PDF available
+ * Fetch PDF for a paper using arXiv ID, DOI, or OpenAlex OA URL.
+ * Returns Buffer or null if no PDF available.
  */
 export async function fetchPaperPDF(paper: Paper): Promise<Buffer | null> {
   // Try arXiv first (most reliable for open-access)
@@ -11,7 +11,7 @@ export async function fetchPaperPDF(paper: Paper): Promise<Buffer | null> {
     if (pdfBuffer) return pdfBuffer;
   }
 
-  // Try openAccessPdf from Semantic Scholar
+  // Try openAccessPdf (OpenAlex oa_url)
   if (paper.openAccessPdf?.url) {
     const pdfBuffer = await tryPDFUrl(paper.openAccessPdf.url);
     if (pdfBuffer) return pdfBuffer;
@@ -29,21 +29,15 @@ export async function fetchPaperPDF(paper: Paper): Promise<Buffer | null> {
   return null;
 }
 
-/**
- * Fetch PDF from arXiv
- */
+/** Fetch PDF from arXiv */
 async function tryArXivPDF(arxivId: string): Promise<Buffer | null> {
-  // arXiv IDs may have version suffix (e.g., 2301.00001v1)
-  // Strip version suffix if present for URL construction
   const cleanId = arxivId.replace(/v\d+$/, "");
   const url = `https://arxiv.org/pdf/${cleanId}.pdf`;
 
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: {
-        Accept: "application/pdf",
-      },
+      headers: { Accept: "application/pdf" },
       redirect: "follow",
     });
 
@@ -61,16 +55,12 @@ async function tryArXivPDF(arxivId: string): Promise<Buffer | null> {
   }
 }
 
-/**
- * Fetch PDF from a direct URL
- */
+/** Fetch PDF from a direct URL */
 async function tryPDFUrl(url: string): Promise<Buffer | null> {
   try {
     const response = await fetch(url, {
       method: "GET",
-      headers: {
-        Accept: "application/pdf",
-      },
+      headers: { Accept: "application/pdf" },
       redirect: "follow",
     });
 
@@ -88,17 +78,12 @@ async function tryPDFUrl(url: string): Promise<Buffer | null> {
   }
 }
 
-/**
- * Fetch PDF via DOI using CrossRef API to find open-access PDF URL
- */
+/** Fetch PDF via DOI using CrossRef API to find open-access PDF URL */
 async function tryDOIPDF(doi: string): Promise<Buffer | null> {
   try {
-    // First try CrossRef for open-access link
     const crossRefUrl = `https://api.crossref.org/works/${encodeURIComponent(doi)}`;
     const crossRefResponse = await fetch(crossRefUrl, {
-      headers: {
-        Accept: "application/json",
-      },
+      headers: { Accept: "application/json" },
     });
 
     if (crossRefResponse.ok) {
@@ -114,13 +99,10 @@ async function tryDOIPDF(doi: string): Promise<Buffer | null> {
       }
     }
 
-    // Fallback: try doi.org redirect
     const doiUrl = `https://doi.org/${doi}`;
     const response = await fetch(doiUrl, {
       method: "GET",
-      headers: {
-        Accept: "application/pdf",
-      },
+      headers: { Accept: "application/pdf" },
       redirect: "follow",
     });
 
@@ -138,9 +120,7 @@ async function tryDOIPDF(doi: string): Promise<Buffer | null> {
   }
 }
 
-/**
- * Check if a paper has a fetchable PDF source
- */
+/** Check if a paper has a fetchable PDF source */
 export function hasPDFSource(paper: Paper): boolean {
   return !!(
     paper.externalIds?.ArXiv ||

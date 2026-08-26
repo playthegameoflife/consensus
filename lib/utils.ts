@@ -31,15 +31,31 @@ export async function searchPapers(
   return res.json();
 }
 
+/** Map OpenAlex publication type + content heuristics to consensus.app study-type label. */
 export function getStudyType(paper: Paper): string {
   const types = paper.publicationTypes || [];
-  if (types.includes("Meta-Analysis")) return "Meta-Analysis";
-  if (types.includes("SystematicReview")) return "Systematic Review";
-  if (types.includes("Review")) return "Review";
-  if (types.includes("ClinicalTrial")) return "Clinical Trial";
-  if (types.includes("RandomizedControlledTrial")) return "RCT";
-  if (types.includes("CrossSectionalStudy")) return "Cross-Sectional";
-  if (types.includes("CohortStudy")) return "Cohort";
+  const title = paper.title || "";
+  const titleLower = title.toLowerCase();
+
+  if (titleLower.includes("meta-analysis") || titleLower.includes("meta analysis"))
+    return "Meta-Analysis";
+  if (titleLower.includes("systematic review")) return "Systematic Review";
+  if (types.includes("review") || titleLower.startsWith("review:"))
+    return "Review";
+  if (
+    titleLower.includes("randomized controlled trial") ||
+    titleLower.includes("randomised controlled trial") ||
+    /\brct\b/.test(titleLower)
+  )
+    return "RCT";
+  if (titleLower.includes("clinical trial")) return "Clinical Trial";
+  if (types.includes("dissertation")) return "Dissertation";
+  if (types.includes("dataset")) return "Dataset";
+  if (types.includes("book") || types.includes("book-chapter")) return "Book";
+  if (types.includes("report")) return "Report";
+  if (types.includes("editorial")) return "Editorial";
+  if (types.includes("letter")) return "Letter";
+
   return paper.fieldsOfStudy?.[0] || "Study";
 }
 

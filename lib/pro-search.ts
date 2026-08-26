@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchPapers } from "@/lib/semantic-scholar";
+import { searchPapers } from "@/lib/openalex";
 import { extractAIFinding } from "@/lib/llm";
 import { Paper } from "@/lib/types";
 

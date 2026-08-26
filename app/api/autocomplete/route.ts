@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { autocomplete } from "@/lib/semantic-scholar";
+import { autocomplete } from "@/lib/openalex";
 
 export const runtime = "edge";
 

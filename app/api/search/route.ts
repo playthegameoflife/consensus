@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchPapers } from "@/lib/semantic-scholar";
+import { searchPapers } from "@/lib/openalex";
 import { extractAIFinding as extractAIFindingFromLib, extractAllClaims } from "@/lib/llm";
 import { fetchPaperPDF, hasPDFSource } from "@/lib/pdf-fetch";
 import { extractTextFromPDF } from "@/lib/pdf-extract";
@@ -66,13 +66,12 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("Search error:", err);
 
-    // Check for rate limiting
     const errorMessage = err instanceof Error ? err.message : String(err);
     if (errorMessage.includes("429") || errorMessage.includes("rate") || errorMessage.includes("Too Many Requests")) {
       return NextResponse.json(
         {
           error: "rate_limited",
-          message: "Semantic Scholar API is rate-limited. Add an API key to .env.local to increase limits.",
+          message: "OpenAlex is rate-limited. Try again in a few seconds.",
           papers: [],
         },
         { status: 429 }
@@ -86,11 +85,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/**
- * Deep mode: fetch PDFs, extract claims, compute consensus
- */
 async function handleDeepMode(papers: Paper[], query: string) {
-  // Helper to get full text for a paper
   async function getFullText(paper: Paper): Promise<string | null> {
     if (!hasPDFSource(paper)) return null;
 
@@ -107,13 +102,9 @@ async function handleDeepMode(papers: Paper[], query: string) {
     }
   }
 
-  // Extract claims from all papers (full text or abstract)
   const claimsMap = await extractAllClaims(papers, query, getFullText);
-
-  // Compute consensus scores
   const consensusResult = await scoreConsensus(claimsMap);
 
-  // Build response with claims and consensus scores
   const papersWithClaims = await Promise.all(
     papers.map(async (paper) => {
       const claims = claimsMap.get(paper.paperId) || [];

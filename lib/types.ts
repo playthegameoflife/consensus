@@ -1,5 +1,13 @@
-// Semantic Scholar API types
+// OpenAlex API types — consensus.app's data source
+
+export interface Author {
+  authorId?: string;
+  name: string;
+  orcid?: string;
+}
+
 export interface Paper {
+  // Stable OpenAlex Work ID (e.g. "W3013463190")
   paperId: string;
   title: string;
   authors: Author[];
@@ -8,20 +16,25 @@ export interface Paper {
   journal?: string;
   citationCount: number;
   doi?: string;
+  // OpenAlex IDs (DOIs, PMIDs, PMCs, ArXiv IDs)
   externalIds?: {
     DOI?: string;
     ArXiv?: string;
+    PMID?: string;
+    PMC?: string;
+    MAG?: string;
   };
+  // "article" | "book-chapter" | "dissertation" | "paratext" | "dataset" | "review" | "letter" | "editorial" | "erratum" | "book" | "lib-genre" | "reference-entry" | "report" | "standard" | "other"
   publicationTypes?: string[];
   openAccessPdf?: {
     url: string;
   };
+  // OpenAlex concept / topic slugs (best-effort)
   fieldsOfStudy?: string[];
-}
-
-export interface Author {
-  authorId: string;
-  name: string;
+  // OpenAlex open access status: "OA" | "closed" | "hybrid" | "bronze" | "green" | "gold"
+  openAccessStatus?: string;
+  // OpenAlex language code (e.g. "en")
+  language?: string;
 }
 
 export interface SearchResult {

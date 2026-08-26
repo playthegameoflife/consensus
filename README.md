@@ -87,7 +87,7 @@ For HTTP+SSE mode:
 | Tool | Description |
 |------|-------------|
 | `search_papers` | Search academic papers by query with optional filters (year range, open-access, study type) |
-| `get_paper` | Get full details of a specific paper by Semantic Scholar ID |
+| `get_paper` | Get full details of a specific paper by OpenAlex Work ID |
 | `get_paper_citations` | Get papers that cite a specific paper |
 | `autocomplete` | Get search suggestions for partial queries |
 
@@ -100,7 +100,7 @@ Search for papers about vitamin D and covid:
 
 Get details for a specific paper:
 - Tool: get_paper
-- Arguments: {"paper_id": "abc123..."}
+- Arguments: {"paper_id": "W3013463190"}  (OpenAlex Work ID)
 
 Get papers that cite a paper:
 - Tool: get_paper_citations
@@ -111,7 +111,7 @@ Get papers that cite a paper:
 
 | Variable | Description |
 |----------|-------------|
-| `SEMANTIC_SCHOLAR_API_KEY` | Free API key from semanticscholar.org — removes rate limits |
+| `OPENALEX_MAILTO` | Contact email sent in `User-Agent` / `mailto=` for OpenAlex "polite pool" (recommended for production) |
 | `GROQ_API_KEY` | Optional Groq API key for AI-generated paper summaries |
 | `HTTP_MODE` | Set to `1` to enable HTTP+SSE transport instead of stdio |
 | `MCP_PORT` | Port for HTTP+SSE server (default: 3457) |

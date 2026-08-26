@@ -6,7 +6,7 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 export async function extractAIFinding(paper: Paper, query: string): Promise<string | undefined> {
   if (!GROQ_API_KEY) {
     // Fallback: return a generic finding from abstract
-    return paper.abstract?.slice(0, 200) + "...";
+    return paper.abstract ? paper.abstract.slice(0, 200) + "..." : undefined;
   }
 
   const abstract = paper.abstract || "No abstract available.";
