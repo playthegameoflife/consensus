@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Maximize2 } from "lucide-react";
 import { Paper } from "@/lib/types";
 
 interface GraphNode {
@@ -109,6 +110,7 @@ function simulateLayout(
 
 export function CitationGraph({ paper, onNodeClick }: CitationGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const fullscreenContainerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 480, height: 320 });
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [links, setLinks] = useState<GraphLink[]>([]);
@@ -116,6 +118,8 @@ export function CitationGraph({ paper, onNodeClick }: CitationGraphProps) {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const activeContainerRef = fullscreen ? fullscreenContainerRef : containerRef;
   const [citingPapers, setCitingPapers] = useState<
     { paperId: string; title: string; year?: number; citationCount: number }[]
   >([]);
@@ -137,6 +141,19 @@ export function CitationGraph({ paper, onNodeClick }: CitationGraphProps) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Measure fullscreen container
+  useEffect(() => {
+    if (!fullscreen) return;
+    const el = fullscreenContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setDimensions({ width: Math.max(width, 400), height: Math.max(height, 300) });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fullscreen]);
 
   // Fetch graph data
   useEffect(() => {
@@ -231,7 +248,34 @@ export function CitationGraph({ paper, onNodeClick }: CitationGraphProps) {
   };
 
   return (
-    <div ref={containerRef} className="relative w-full h-full min-h-[200px]">
+    <>
+      {/* Fullscreen modal */}
+      {fullscreen && (
+        <div className="fixed inset-0 z-[100] bg-black/80 flex flex-col">
+          <div className="flex items-center justify-between p-4 bg-black/60">
+            <div className="text-white text-sm font-medium">Citation Graph — {paper.title}</div>
+            <button
+              onClick={() => setFullscreen(false)}
+              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+            >
+              <Maximize2 className="w-4 h-4" />
+            </button>
+          </div>
+          <div ref={fullscreenContainerRef} className="flex-1 w-full min-h-0" />
+        </div>
+      )}
+
+      <div ref={containerRef} className="relative w-full h-full min-h-[200px]">
+        {/* Fullscreen button */}
+        {!isLoading && nodes.length > 0 && (
+          <button
+            onClick={() => setFullscreen(true)}
+            className="absolute top-2 left-2 p-1.5 rounded-md bg-white/80 hover:bg-white text-slate-500 hover:text-slate-700 transition-colors z-10"
+            title="View fullscreen"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
@@ -308,7 +352,7 @@ export function CitationGraph({ paper, onNodeClick }: CitationGraphProps) {
                 style={{ cursor: "pointer" }}
                 onMouseEnter={(e) => {
                   setHoveredNode(node.id);
-                  const rect = containerRef.current?.getBoundingClientRect();
+                  const rect = activeContainerRef.current?.getBoundingClientRect();
                   if (rect) {
                     setTooltip({
                       x: e.clientX - rect.left,
@@ -406,5 +450,6 @@ export function CitationGraph({ paper, onNodeClick }: CitationGraphProps) {
         </div>
       )}
     </div>
+    </>
   );
 }

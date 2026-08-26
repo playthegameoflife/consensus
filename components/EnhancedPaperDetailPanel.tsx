@@ -16,6 +16,8 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CitationGraph } from "@/components/CitationGraph";
+import ChatWithPaper from "@/components/ChatWithPaper";
+import { BookMarked, MessageCircle } from "lucide-react";
 import {
   X,
   ExternalLink,
@@ -89,6 +91,7 @@ export function EnhancedPaperDetailPanel({
 }: EnhancedPaperDetailPanelProps) {
   const [abstractExpanded, setAbstractExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [showChat, setShowChat] = useState(false);
 
   const [citations, setCitations] = useState<Citation[]>([]);
   const [references, setReferences] = useState<Citation[]>([]);
@@ -239,12 +242,16 @@ export function EnhancedPaperDetailPanel({
           {/* Tabs */}
           <div className="px-6 flex-shrink-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full grid grid-cols-5 h-9 bg-slate-100">
+              <TabsList className="w-full grid grid-cols-6 h-9 bg-slate-100">
                 <TabsTrigger value="overview" className="text-xs">Overview</TabsTrigger>
                 <TabsTrigger value="claims" className="text-xs">Claims</TabsTrigger>
                 <TabsTrigger value="citations" className="text-xs">Citations</TabsTrigger>
                 <TabsTrigger value="related" className="text-xs">Related</TabsTrigger>
                 <TabsTrigger value="graph" className="text-xs">Graph</TabsTrigger>
+                <TabsTrigger value="chat" className="text-xs">
+                  <MessageCircle className="w-3 h-3 inline mr-1" />
+                  Chat
+                </TabsTrigger>
               </TabsList>
 
               {/* Overview Tab */}
@@ -462,6 +469,11 @@ export function EnhancedPaperDetailPanel({
                 <p className="text-xs text-slate-400 mt-2 text-center">
                   Click a node to expand · {citations.length} citing · {references.length} references
                 </p>
+              </TabsContent>
+
+              {/* Chat Tab */}
+              <TabsContent value="chat" className="pt-0 h-[480px]">
+                <ChatWithPaper paper={paper} onClose={() => setActiveTab('overview')} />
               </TabsContent>
             </Tabs>
           </div>

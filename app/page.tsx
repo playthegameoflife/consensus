@@ -8,8 +8,10 @@ import { FilterSidebar, Filters } from "@/components/FilterSidebar";
 import { EnhancedPaperDetailPanel } from "@/components/EnhancedPaperDetailPanel";
 import { SearchHistory, addToHistory } from "@/components/SearchHistory";
 import { MedicalModeToggle, Corpus } from "@/components/MedicalModeToggle";
+import { SearchModeToggle, SearchMode } from "@/components/SearchModeToggle";
+import { ScholarAgent } from "@/components/ScholarAgent";
 import { Paper } from "@/lib/types";
-import { Loader2, Search, ArrowUp, ArrowDown, Minus, FileQuestion, Clock } from "lucide-react";
+import { Loader2, Search, ArrowUp, ArrowDown, Minus, FileQuestion, Clock, Bookmark, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -70,9 +72,32 @@ export default function Home() {
     citationMin: 0,
   });
   const [corpus, setCorpus] = useState<Corpus>("all");
+  const [searchMode, setSearchMode] = useState<SearchMode>("basic");
   const [selectedPaper, setSelectedPaper] = useState<(Paper & { aiFinding?: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchTime, setSearchTime] = useState<number | null>(null);
+  const [savedSearches, setSavedSearches] = useState<string[]>([]);
+
+  // Load saved searches
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('consensus_saved_searches')
+      if (stored) setSavedSearches(JSON.parse(stored))
+    } catch {}
+  }, [])
+
+  function toggleSaveSearch(q: string) {
+    let next: string[]
+    if (savedSearches.includes(q)) {
+      next = savedSearches.filter(s => s !== q)
+    } else {
+      next = [q, ...savedSearches.filter(s => s !== q)].slice(0, 20)
+    }
+    setSavedSearches(next)
+    try { localStorage.setItem('consensus_saved_searches', JSON.stringify(next)) } catch {}
+  }
+
+  const isCurrentSaved = query ? savedSearches.includes(query) : false
 
   // Medical mode default study types
   const medicalDefaultStudyTypes = ["Clinical Trial", "RCT", "Systematic Review", "Meta-Analysis"];
@@ -96,7 +121,7 @@ export default function Home() {
         const params = new URLSearchParams({
           q,
           offset: String(offset),
-          limit: "10",
+          limit: searchMode === 'deep' ? '50' : searchMode === 'pro' ? '20' : '10',
         });
         if (filters.yearRange[0] !== 1900 || filters.yearRange[1] !== 2026) {
           params.set("yearRange", filters.yearRange.join("-"));
@@ -171,6 +196,14 @@ export default function Home() {
           {/* Search */}
           <div className="flex-1 max-w-3xl mx-auto">
             <SearchBar onSearch={(q) => doSearch(q, 0)} isLoading={isLoading} />
+          </div>
+
+          {/* Mode toggle */}
+          <div className="flex-shrink-0">
+            <SearchModeToggle
+              initialMode={searchMode}
+              onModeChange={setSearchMode}
+            />
           </div>
 
           {/* Corpus toggle */}
@@ -260,6 +293,33 @@ export default function Home() {
             {!isLoading && results && results.papers.length > 0 && (
               <>
                 <ConsensusSummary papers={results.papers} />
+
+                {/* Scholar Agent for Pro/Deep mode */}
+                {searchMode !== 'basic' && (
+                  <div className="mb-5 bg-white rounded-2xl border border-slate-200 p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center">
+                        <Sparkles className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-800">
+                          {searchMode === 'pro' ? 'Pro Scholar Agent' : 'Deep Scholar Agent'}
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          {searchMode === 'pro'
+                            ? `Analyzing top ${Math.min(20, results.papers.length)} papers with AI synthesis`
+                            : `Comprehensive analysis of all ${results.papers.length} papers`}
+                        </p>
+                      </div>
+                    </div>
+                    <ScholarAgent
+                      papers={results.papers}
+                      query={query}
+                      onPaperClick={(p) => setSelectedPaper(p as Paper & { aiFinding?: string })}
+                    />
+                  </div>
+                )}
+
                 <RelatedSearches
                   query={query}
                   papers={results.papers}
@@ -318,11 +378,26 @@ export default function Home() {
                 )}
 
                 {/* Showing count */}
-                {results.papers.length < results.total && !isLoadingMore && (
-                  <p className="text-center text-xs text-slate-400 mt-3">
-                    Showing {results.papers.length} of {results.total.toLocaleString()} results
-                  </p>
-                )}
+                <div className="flex items-center justify-between mt-3">
+                  {results.papers.length < results.total && !isLoadingMore && (
+                    <p className="text-xs text-slate-400">
+                      Showing {results.papers.length} of {results.total.toLocaleString()} results
+                    </p>
+                  )}
+                  {query && (
+                    <button
+                      onClick={() => toggleSaveSearch(query)}
+                      className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full transition-colors ml-auto ${
+                        isCurrentSaved
+                          ? 'bg-blue-100 text-blue-600'
+                          : 'bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600'
+                      }`}
+                    >
+                      <Bookmark className={`w-3.5 h-3.5 ${isCurrentSaved ? 'fill-current' : ''}`} />
+                      {isCurrentSaved ? 'Saved' : 'Save search'}
+                    </button>
+                  )}
+                </div>
               </>
             )}
 
