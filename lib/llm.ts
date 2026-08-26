@@ -90,7 +90,10 @@ Respond with ONLY the key finding in 1-2 sentences. Be specific and quantitative
     150
   );
   // Filter out common LLM deflection responses
-  if (!result || /don't have access|cannot access|no abstract|not available/i.test(result)) {
+  if (
+    !result ||
+    /don't have (access|an abstract)|cannot access|no abstract|not available|please provide/i.test(result)
+  ) {
     return undefined;
   }
   return result;

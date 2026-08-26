@@ -112,13 +112,18 @@ async function synthesizeAnswer(
   }
 
   const paperSummaries = papers
-    .map((p) => {
+    .map((p, i) => {
       const pClaims = claims.get(p.paperId) || [];
-      return `## ${p.title} (${p.year})\n${p.authors.map((a) => a.name).join(", ")}\n${p.journal ? p.journal + "\n" : ""}Finding: ${pClaims.join("; ") || "No AI finding extracted."}`;
+      return `[${i + 1}] ${p.title} (${p.year})\nAuthors: ${p.authors.map((a) => a.name).join(", ")}\n${p.journal ? `Journal: ${p.journal}\n` : ""}Finding: ${pClaims.join("; ") || "No AI finding extracted."}`;
     })
     .join("\n\n");
 
-  const prompt = `You are a research assistant. Based on the following papers and their AI-extracted findings, synthesize a comprehensive answer to the query: "${query}"
+  const prompt = `You are a research assistant. Based on the following numbered papers and their findings, synthesize a comprehensive answer to the query: "${query}"
+
+CRITICAL CITATION RULES:
+- Every factual claim MUST end with an inline citation in brackets matching the paper number, e.g. "...improved sleep quality [3]." or "29 of 34 studies showed benefit [1]."
+- Cite MULTIPLE papers when they agree: "[1][2][5]"
+- Never state a finding without its citation number.
 
 Focus on:
 - What the overall consensus is across papers
@@ -129,7 +134,7 @@ Focus on:
 Papers:
 ${paperSummaries}
 
-Respond with a well-structured answer (3-5 paragraphs) grounded ONLY in the papers above. Do not invent findings.`;
+Respond with a well-structured answer (3-5 paragraphs, plain text with [N] citations, no markdown headers) grounded ONLY in the papers above. Do not invent findings.`;
 
   const model = OPENROUTER_KEY
     ? (process.env.OPENROUTER_SYNTH_MODEL || "deepseek/deepseek-v4-flash-0731")

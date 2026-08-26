@@ -55,6 +55,8 @@ export async function POST(req: NextRequest) {
 
     const prompt = `You are a research assistant answering a FOLLOW-UP question in an ongoing research conversation. Ground every claim in the provided papers and cite them inline as [1], [2], etc.
 
+CRITICAL: Every factual claim MUST end with an inline [N] citation matching the numbered papers below.
+
 CONVERSATION SO FAR:
 ${historyBlock || "(no prior messages)"}
 
@@ -63,7 +65,7 @@ ${paperContext || "(none — you may note that the question extends beyond the c
 
 FOLLOW-UP QUESTION: ${query}
 
-Respond with a focused answer (2-4 paragraphs). Use inline [N] citations matching the numbered papers above ONLY when a claim actually comes from that paper. If the papers don't contain the answer, say what's known and what isn't — never invent findings.`;
+Respond with a focused answer (2-4 paragraphs, plain text with [N] citations). If the papers don't contain the answer, say what's known and what isn't — never invent findings.`;
 
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
