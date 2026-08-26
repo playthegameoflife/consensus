@@ -132,7 +132,7 @@ ${paperSummaries}
 Respond with a well-structured answer (3-5 paragraphs) grounded ONLY in the papers above. Do not invent findings.`;
 
   const model = OPENROUTER_KEY
-    ? (process.env.OPENROUTER_MODEL || "deepseek/deepseek-v4-flash-0731")
+    ? (process.env.OPENROUTER_SYNTH_MODEL || "deepseek/deepseek-v4-flash-0731")
     : "llama-3.1-8b-instant";
   const url = OPENROUTER_KEY
     ? "https://openrouter.ai/api/v1/chat/completions"

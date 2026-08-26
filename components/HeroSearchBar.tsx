@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  Database,
+  Plus,
   ChevronDown,
   Sparkles,
   SlidersHorizontal,
@@ -17,28 +17,39 @@ interface HeroSearchBarProps {
   onCorpusChange?: (corpus: string) => void;
   deep?: boolean;
   onDeepChange?: (deep: boolean) => void;
-  onQuickAction?: (action: QuickAction) => void;
 }
 
 export type QuickAction =
-  | { type: "report" }
-  | { type: "consensus" }
-  | { type: "method" };
-
-const SOURCE_OPTIONS = [
-  "All sources",
-  "PubMed",
-  "arXiv",
-  "bioRxiv",
-  "medRxiv",
-];
+  | { type: "chat-library" }
+  | { type: "method" }
+  | { type: "comparison" };
 
 const CORPUS_OPTIONS = ["All papers", "Medical"];
 
-const QUICK_ACTIONS: { icon: string; label: string; action: QuickAction }[] = [
-  { icon: "📊", label: "Draft a report", action: { type: "report" } },
-  { icon: "✦", label: "Find the Consensus", action: { type: "consensus" } },
-  { icon: "🔬", label: "Find studies by method", action: { type: "method" } },
+const QUICK_ACTIONS: {
+  icon: string;
+  label: string;
+  action: QuickAction;
+  template: string;
+}[] = [
+  {
+    icon: "💬",
+    label: "Chat with My Library",
+    action: { type: "chat-library" },
+    template: "Summarize the key findings from my library about ",
+  },
+  {
+    icon: "🔬",
+    label: "Find studies by method",
+    action: { type: "method" },
+    template: "What are the studies using ",
+  },
+  {
+    icon: "📊",
+    label: "Build a comparison table",
+    action: { type: "comparison" },
+    template: "Create a comparison table of ",
+  },
 ];
 
 export function HeroSearchBar({
@@ -48,12 +59,9 @@ export function HeroSearchBar({
   onCorpusChange,
   deep: deepProp = false,
   onDeepChange,
-  onQuickAction,
 }: HeroSearchBarProps) {
   const [query, setQuery] = useState("");
-  const [sourceOpen, setSourceOpen] = useState(false);
   const [corpusOpen, setCorpusOpen] = useState(false);
-  const [source, setSource] = useState(SOURCE_OPTIONS[0]);
   const [corpus, setCorpus] = useState(corpusProp);
   const [deep, setDeep] = useState(deepProp);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -78,30 +86,22 @@ export function HeroSearchBar({
     onCorpusChange?.(c);
   };
 
-  const handleSource = (s: string) => {
-    setSource(s);
-    setSourceOpen(false);
-  };
-
   const handleDeep = () => {
     const next = !deep;
     setDeep(next);
     onDeepChange?.(next);
   };
 
-  const handleQuickAction = (a: QuickAction) => {
-    // Consensus.app behavior: a quick action sets the mode and pre-fills a
-    // prompt template for the user to complete — it does NOT run a literal
-    // search for the pill label.
-    const templates: Record<QuickAction["type"], string> = {
-      report: "Write a report about ",
-      consensus: "What is the consensus on ",
-      method: "What are the studies using ",
-    };
-    setQuery(templates[a.type]);
+  const handleQuickAction = (
+    action: QuickAction,
+    template: string
+  ) => {
+    // consensus.app behavior: a quick action pre-fills a prompt template and
+    // enables Pro — it does NOT run a literal search for the chip label.
+    setQuery(template);
+    setDeep(true);
     inputRef.current?.focus();
     onDeepChange?.(true);
-    onQuickAction?.(a);
   };
 
   const canSearch = query.trim().length > 0 && !isLoading;
@@ -150,52 +150,24 @@ export function HeroSearchBar({
         {/* Row 2: controls */}
         <div className="flex justify-between items-center pt-1">
           <div className="flex gap-2 items-center">
-            {/* Sources selector */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setSourceOpen((v) => !v);
-                  setCorpusOpen(false);
-                }}
-                data-testid="data-source-selector-button"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <Database className="w-3.5 h-3.5 text-slate-400" />
-                <span className="font-medium">{source}</span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 transition-transform ${
-                    sourceOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </button>
-              {sourceOpen && (
-                <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-50">
-                  {SOURCE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt}
-                      onClick={() => handleSource(opt)}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
-                        opt === source
-                          ? "text-cyan-600 font-medium"
-                          : "text-slate-700"
-                      }`}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* New thread + button */}
+            <button
+              type="button"
+              title="New thread"
+              onClick={() => {
+                setQuery("");
+                inputRef.current?.focus();
+              }}
+              className="flex-shrink-0 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-cyan-600 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
 
             {/* Corpus selector */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => {
-                  setCorpusOpen((v) => !v);
-                  setSourceOpen(false);
-                }}
+                onClick={() => setCorpusOpen((v) => !v)}
                 data-testid="corpus-selector-button"
                 className="flex items-center gap-1 px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
@@ -225,7 +197,7 @@ export function HeroSearchBar({
               )}
             </div>
 
-            {/* Deep switch (role=switch, disabled until query) */}
+            {/* Deep+ switch (dashed border when off, like consensus.app) */}
             <button
               type="button"
               role="switch"
@@ -233,10 +205,10 @@ export function HeroSearchBar({
               aria-label="Deep"
               disabled={!canSearch}
               onClick={handleDeep}
-              className={`group relative flex items-center gap-2 h-9 px-3 rounded-xl transition-colors text-sm font-medium ${
+              className={`group relative flex items-center gap-2 h-9 px-3 rounded-xl text-sm font-medium border border-dashed transition-colors ${
                 deep
-                  ? "bg-cyan-50 text-cyan-700"
-                  : "text-slate-500 bg-transparent"
+                  ? "bg-purple-50 text-purple-700 border-solid border-purple-300"
+                  : "text-slate-500 border-slate-300"
               } ${
                 canSearch
                   ? "hover:bg-slate-100 cursor-pointer"
@@ -246,10 +218,10 @@ export function HeroSearchBar({
               <Sparkles
                 className={`w-3.5 h-3.5 ${deep ? "fill-current" : ""}`}
               />
-              <span>Deep</span>
+              <span>Deep+</span>
               <span
-                className={`relative inline-flex w-8 h-[18px] rounded-full transition-colors ${
-                  deep ? "bg-cyan-500" : "bg-slate-300"
+                className={`relative inline-flex w-8 h-[18px] rounded-full transition-colors flex-shrink-0 ${
+                  deep ? "bg-purple-500" : "bg-slate-300"
                 }`}
               >
                 <span
@@ -288,13 +260,13 @@ export function HeroSearchBar({
         </div>
       </div>
 
-      {/* Quick action pills — set prompt template + mode, never literal search */}
+      {/* Quick action chips — prefill prompt templates like consensus.app */}
       <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
         {QUICK_ACTIONS.map((action) => (
           <button
             key={action.label}
             type="button"
-            onClick={() => handleQuickAction(action.action)}
+            onClick={() => handleQuickAction(action.action, action.template)}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-full text-sm text-slate-700 transition-all shadow-sm"
           >
             <span>{action.icon}</span>

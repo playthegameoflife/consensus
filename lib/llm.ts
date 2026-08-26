@@ -1,8 +1,10 @@
 import { Paper } from "./types";
 
 // LLM provider detection: OpenRouter → Groq → abstract-only fallback
+// Two model tiers: fast model for per-paper extraction, big model for synthesis
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "deepseek/deepseek-v4-flash-0731";
+const OPENROUTER_FAST_MODEL =
+  process.env.OPENROUTER_FAST_MODEL || "meta-llama/llama-3.1-8b-instruct";
 const GROQ_KEY = process.env.GROQ_API_KEY;
 
 const LLM_URL = OPENROUTER_KEY
@@ -10,7 +12,6 @@ const LLM_URL = OPENROUTER_KEY
   : "https://api.groq.com/openai/v1/chat/completions";
 
 const LLM_KEY = OPENROUTER_KEY || GROQ_KEY;
-const LLM_MODEL = OPENROUTER_KEY ? OPENROUTER_MODEL : "llama-3.1-8b-instant";
 
 function hasLLM() {
   return !!LLM_KEY;
@@ -19,9 +20,12 @@ function hasLLM() {
 async function callLLM(
   systemPrompt: string,
   userPrompt: string,
-  maxTokens: number
+  maxTokens: number,
+  model?: string
 ): Promise<string | undefined> {
   if (!LLM_KEY) return undefined;
+
+  const useModel = model || (OPENROUTER_KEY ? OPENROUTER_FAST_MODEL : "llama-3.1-8b-instant");
 
   try {
     const headers: Record<string, string> = {
@@ -39,7 +43,7 @@ async function callLLM(
       method: "POST",
       headers,
       body: JSON.stringify({
-        model: LLM_MODEL,
+        model: useModel,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -81,11 +85,15 @@ ${abstract}
 Respond with ONLY the key finding in 1-2 sentences. Be specific and quantitative when possible. If the paper is not relevant to the query, say "This paper may not directly address the query."`;
 
   const result = await callLLM(
-    "You are a helpful research assistant. Extract key findings from academic papers.",
+    "You are a helpful research assistant. Extract key findings from academic papers. Respond with the finding only, never mention access or availability.",
     prompt,
     150
   );
-  return result || undefined;
+  // Filter out common LLM deflection responses
+  if (!result || /don't have access|cannot access|no abstract|not available/i.test(result)) {
+    return undefined;
+  }
+  return result;
 }
 
 export async function extractClaimsFromFullText(

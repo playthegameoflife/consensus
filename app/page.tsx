@@ -1,22 +1,24 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Logo } from "@/components/Logo";
 import { LeftSidebar } from "@/components/LeftSidebar";
-import { SearchBar } from "@/components/SearchBar";
-import { PaperCard } from "@/components/PaperCard";
-import { ConsensusMeter } from "@/components/ConsensusMeter";
 import { FilterSidebar, Filters } from "@/components/FilterSidebar";
 import { EnhancedPaperDetailPanel } from "@/components/EnhancedPaperDetailPanel";
 import { SearchHistory, addToHistory } from "@/components/SearchHistory";
 import { Corpus as CorpusType } from "@/components/MedicalModeToggle";
 import { SearchMode as SearchModeType } from "@/components/SearchModeToggle";
 import { HeroSearchBar } from "@/components/HeroSearchBar";
-import { ProAnalysisBlock } from "@/components/ProAnalysisBlock";
+import {
+  ThreadView,
+  FollowUpMessage,
+} from "@/components/ThreadView";
+import {
+  MeterVerdict,
+  classifyVerdict,
+} from "@/components/ConsensusMeter4Way";
 import { Paper } from "@/lib/types";
-import { Loader2, Search, ArrowUp, ArrowDown, Minus, Clock, Bookmark, HelpCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { HelpCircle, Search, RefreshCw } from "lucide-react";
 
 interface SearchResult {
   papers: (Paper & { aiFinding?: string; consensusScore?: number })[];
@@ -24,79 +26,11 @@ interface SearchResult {
   offset: number;
 }
 
-function ConsensusSummary({ papers }: { papers: SearchResult["papers"] }) {
-  if (!papers.length) return null;
-
-  // Compute consensus scores client-side if not provided (uses Jaccard
-  // similarity over AI findings / abstracts to mirror consensus.app's meter).
-  const scores = (
-    papers[0].consensusScore !== undefined
-      ? papers.map((p) => p.consensusScore!)
-      : computeLocalConsensusScores(papers)
-  ).filter((s): s is number => s !== undefined && Number.isFinite(s));
-
-  if (!scores.length) return null;
-
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const agreeing = scores.filter((s) => s > 0.3).length;
-  const disagreeing = scores.filter((s) => s < -0.15).length;
-  const mixed = scores.length - agreeing - disagreeing;
-  const verdict =
-    avg > 0.4 ? "Mostly agree" : avg < -0.15 ? "Mostly disagree" : "Mixed evidence";
-
-  return (
-    <div className="mb-5 p-4 bg-white rounded-2xl border border-slate-200">
-      <div className="flex items-center gap-5">
-        <ConsensusMeter score={avg} total={scores.length} />
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-1.5 text-emerald-600">
-            <ArrowUp className="w-4 h-4" />
-            <span className="font-medium">{agreeing} agreeing</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-red-500">
-            <ArrowDown className="w-4 h-4" />
-            <span className="font-medium">{disagreeing} disagreeing</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <Minus className="w-4 h-4" />
-            <span>{mixed} mixed</span>
-          </div>
-          <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            {verdict}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Client-side Jaccard consensus score (cheap, no LLM). */
-function computeLocalConsensusScores(
-  papers: SearchResult["papers"]
-): number[] {
-  const texts = papers.map((p) =>
-    (p.aiFinding || p.abstract || "").toLowerCase()
-  );
-  const tokenSets = texts.map((t) => new Set(t.split(/\W+/).filter((w) => w.length > 3)));
-  const scores: number[] = [];
-
-  for (let i = 0; i < papers.length; i++) {
-    if (!tokenSets[i].size) {
-      scores.push(0);
-      continue;
-    }
-    let totalSim = 0;
-    let count = 0;
-    for (let j = 0; j < papers.length; j++) {
-      if (i === j) continue;
-      const inter = new Set([...tokenSets[i]].filter((w) => tokenSets[j].has(w)));
-      const union = new Set([...tokenSets[i], ...tokenSets[j]]);
-      totalSim += union.size > 0 ? inter.size / union.size : 0;
-      count++;
-    }
-    scores.push(count > 0 ? (totalSim - 0.5) * 2 : 0); // remap to ~-1..1
-  }
-  return scores;
+interface SynthesisResult {
+  answer: string;
+  steps?: { action: string; status: string }[];
+  papers?: Paper[];
+  error?: string;
 }
 
 export default function Home() {
@@ -113,12 +47,23 @@ export default function Home() {
   });
   const [corpus, setCorpus] = useState<CorpusType>("all");
   const [searchMode, setSearchMode] = useState<SearchModeType>("basic");
-  const [selectedPaper, setSelectedPaper] = useState<(Paper & { aiFinding?: string }) | null>(null);
+  const [selectedPaper, setSelectedPaper] = useState<
+    (Paper & { aiFinding?: string }) | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
-  const [searchTime, setSearchTime] = useState<number | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [savedSearches, setSavedSearches] = useState<string[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+
+  // Pro synthesis + Threads state
+  const [synthesis, setSynthesis] = useState("");
+  const [synthesisLoading, setSynthesisLoading] = useState(false);
+  const [searchCount, setSearchCount] = useState(1);
+  const [followUps, setFollowUps] = useState<FollowUpMessage[]>([]);
+  const [followUpLoading, setFollowUpLoading] = useState(false);
+
+  // Multi-select for "ask these papers"
+  const [selectedPapers, setSelectedPapers] = useState<Map<string, { title: string; author: string; year: number }>>(new Map());
 
   // Load saved searches + search history
   useEffect(() => {
@@ -145,14 +90,41 @@ export default function Home() {
 
   const isCurrentSaved = query ? savedSearches.includes(query) : false;
 
+  /** Fetch the Pro synthesis for a query in the background. */
+  const fetchSynthesis = useCallback(async (q: string, mode: SearchModeType) => {
+    if (mode === "basic") {
+      setSynthesis("");
+      return;
+    }
+    setSynthesisLoading(true);
+    setSynthesis("");
+    try {
+      const depth = mode === "deep" ? "deep" : "pro";
+      const res = await fetch(
+        `/api/pro-search?q=${encodeURIComponent(q)}&depth=${depth}`
+      );
+      if (!res.ok) throw new Error("synthesis failed");
+      const data: SynthesisResult = await res.json();
+      setSynthesis(data.answer || "No synthesis available.");
+    } catch {
+      setSynthesis("Synthesis unavailable — showing papers below.");
+    } finally {
+      setSynthesisLoading(false);
+    }
+  }, []);
+
   const doSearch = useCallback(
     async (q: string, offset = 0) => {
       if (!q.trim()) return;
-      const startTime = Date.now();
       if (offset === 0) {
         setQuery(q);
         setIsLoading(true);
-        setSearchTime(null);
+        setError(null);
+        setResults(null);
+        // Reset thread state
+        setFollowUps([]);
+        setSelectedPapers(new Map());
+        setSearchCount(1);
         // Add to local history
         const next = [q, ...searchHistory.filter((h) => h !== q)].slice(0, 12);
         setSearchHistory(next);
@@ -160,10 +132,11 @@ export default function Home() {
           localStorage.setItem("consensus_search_history", JSON.stringify(next));
         } catch {}
         addToHistory(q);
+        // Kick off Pro synthesis in parallel (non-blocking)
+        fetchSynthesis(q, searchMode);
       } else {
         setIsLoadingMore(true);
       }
-      setError(null);
 
       try {
         const limit =
@@ -199,8 +172,6 @@ export default function Home() {
         if (!res.ok) throw new Error("Search failed");
         const data: SearchResult = await res.json();
 
-        setSearchTime(Date.now() - startTime);
-
         setResults((prev) => {
           const merged =
             offset === 0
@@ -219,7 +190,7 @@ export default function Home() {
         setIsLoadingMore(false);
       }
     },
-    [filters, corpus, searchMode, searchHistory]
+    [filters, corpus, searchMode, searchHistory, fetchSynthesis]
   );
 
   const handleCorpusChange = useCallback(
@@ -235,17 +206,107 @@ export default function Home() {
   const handleModeChange = useCallback(
     (newMode: SearchModeType) => {
       setSearchMode(newMode);
-      if (query) {
+      if (query && !results) {
         doSearch(query, 0);
+      } else if (query) {
+        // Re-fetch synthesis when mode changes mid-thread
+        fetchSynthesis(query, newMode);
       }
     },
-    [query, doSearch]
+    [query, results, doSearch, fetchSynthesis]
   );
 
+  // Refetch on filter changes only when there's already a query
   useEffect(() => {
-    if (query) doSearch(query, 0);
+    if (query && results) doSearch(query, 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, corpus, searchMode]);
+  }, [filters, corpus]);
+
+  /** Build meter verdicts from current papers */
+  const verdicts: MeterVerdict[] = useMemo(() => {
+    if (!results) return [];
+    return results.papers.slice(0, 20).map((p) => ({
+      paperId: p.paperId,
+      title: p.title,
+      year: p.year,
+      journal: p.journal,
+      verdict: classifyVerdict(p.aiFinding),
+      keyFinding: p.aiFinding,
+    }));
+  }, [results]);
+
+  /** Ask a follow-up question within this thread (Threads). */
+  const handleAskFollowUp = useCallback(
+    async (question: string) => {
+      if (!question.trim() || !query) return;
+      setFollowUps((prev) => [...prev, { role: "user", content: question }]);
+      setFollowUpLoading(true);
+
+      try {
+        // Selected papers become the focused context; otherwise whole thread
+        const contextPapers = selectedPapers.size > 0
+          ? (results?.papers || []).filter((p) => selectedPapers.has(p.paperId))
+          : results?.papers || [];
+
+        const history = followUps.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
+        const res = await fetch("/api/follow-up", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: question,
+            threadHistory: history,
+            papers: contextPapers,
+          }),
+        });
+        const data = await res.json();
+        const answer =
+          data.answer ||
+          data.error ||
+          "Could not generate an answer — try rephrasing.";
+
+        setFollowUps((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: answer,
+            papers: data.newPapers || [],
+          },
+        ]);
+      } catch {
+        setFollowUps((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Something went wrong. Please try again.",
+          },
+        ]);
+      } finally {
+        setFollowUpLoading(false);
+        // Clear selection after asking (like consensus.app)
+        setSelectedPapers(new Map());
+      }
+    },
+    [followUps, query, results, selectedPapers]
+  );
+
+  const toggleSelectPaper = useCallback(
+    (paperId: string, title: string, year: number, author: string) => {
+      setSelectedPapers((prev) => {
+        const next = new Map(prev);
+        if (next.has(paperId)) {
+          next.delete(paperId);
+        } else {
+          next.set(paperId, { title, year, author });
+        }
+        return next;
+      });
+    },
+    []
+  );
 
   const handleLoadMore = useCallback(() => {
     if (results && !isLoadingMore) {
@@ -255,7 +316,7 @@ export default function Home() {
   }, [results, isLoadingMore, query, doSearch]);
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="h-screen overflow-hidden bg-white flex">
       {/* Left sidebar */}
       <LeftSidebar
         collapsed={sidebarCollapsed}
@@ -271,7 +332,7 @@ export default function Home() {
       />
 
       {/* Main area */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col relative">
         {/* Top right sign-up pill */}
         {!query && (
           <div className="absolute top-4 right-4 z-30">
@@ -281,12 +342,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* Centered content */}
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 flex flex-col min-h-0">
           {!query ? (
             // Landing page (no query yet)
             <div className="flex-1 flex flex-col items-center justify-center px-8 pb-12">
-              {/* Logo + heading */}
               <div className="flex items-center gap-2 mb-3">
                 <Logo size={28} />
                 <span className="font-semibold text-[15px] text-slate-800 tracking-tight">
@@ -308,14 +367,13 @@ export default function Home() {
                 onDeepChange={(d) =>
                   handleModeChange(d ? "deep" : "basic")
                 }
-                onQuickAction={() => {}}
               />
 
               <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-slate-500">
                 The new standard for academic research
               </p>
 
-              {/* Help button — links to consensus.app help (matches real app's support chat) */}
+              {/* Help button */}
               <a
                 href="https://help.consensus.app"
                 target="_blank"
@@ -328,144 +386,79 @@ export default function Home() {
               </a>
             </div>
           ) : (
-            // Results page
-            <div className="flex-1 px-8 py-6">
-              {results && (
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <p className="text-sm text-slate-500">
-                      <span className="font-semibold text-slate-800">
-                        {results.total.toLocaleString()}
-                      </span>{" "}
-                      results for{" "}
-                      <span className="font-medium text-slate-700">"{query}"</span>
-                    </p>
-                    {searchTime !== null && (
-                      <span className="flex items-center gap-1 text-xs text-slate-400">
-                        <Clock className="w-3 h-3" />
-                        {searchTime < 1000 ? `${searchTime}ms` : `${(searchTime / 1000).toFixed(1)}s`}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-6">
-                {/* Sidebar */}
-                <div className="w-64 flex-shrink-0 space-y-3">
-                  <SearchHistory onSearch={(q) => doSearch(q, 0)} />
-                  <FilterSidebar
-                    onFilterChange={setFilters}
-                    totalResults={results?.total}
-                  />
-                </div>
-
-                {/* Results */}
-                <div className="flex-1 min-w-0">
-                  {isLoading && (
-                    <div className="space-y-3">
-                      {[...Array(3)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse"
-                        >
-                          <div className="h-5 bg-slate-100 rounded w-3/4 mb-3" />
-                          <div className="h-3 bg-slate-100 rounded w-1/2 mb-4" />
-                          <div className="h-12 bg-slate-50 rounded mb-3" />
-                          <div className="h-3 bg-slate-100 rounded w-5/6" />
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {error && (
-                    <div className="text-center py-12 text-slate-500">
-                      <p>{error}</p>
-                      <button
-                        onClick={() => query && doSearch(query, 0)}
-                        className="mt-2 text-cyan-600 hover:underline text-sm"
-                      >
-                        Try again
-                      </button>
-                    </div>
-                  )}
-
-                  {!isLoading && !error && results && results.papers.length === 0 && (
-                    <div className="text-center py-16">
-                      <Search className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-slate-700 mb-2">
-                        No papers found
-                      </h3>
-                      <p className="text-slate-500 text-sm">
-                        Try different keywords or remove some filters
-                      </p>
-                    </div>
-                  )}
-
-                  {!isLoading && results && results.papers.length > 0 && (
-                    <>
-                      <ProAnalysisBlock
-                        query={query}
-                        enabled={searchMode === "deep"}
-                      />
-                      <ConsensusSummary papers={results.papers} />
-
-                      <div className="space-y-3">
-                        {results.papers.map((paper) => (
-                          <PaperCard
-                            key={paper.paperId}
-                            paper={paper}
-                            onSelect={setSelectedPaper}
-                          />
-                        ))}
-                      </div>
-
-                      {results.papers.length < results.total && (
-                        <div className="mt-6 flex justify-center">
-                          <Button
-                            onClick={handleLoadMore}
-                            disabled={isLoadingMore}
-                            variant="outline"
-                            className="px-8"
-                          >
-                            {isLoadingMore ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                Loading...
-                              </>
-                            ) : (
-                              "Load more results"
-                            )}
-                          </Button>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between mt-3">
-                        {results.papers.length < results.total && !isLoadingMore && (
-                          <p className="text-xs text-slate-400">
-                            Showing {results.papers.length} of{" "}
-                            {results.total.toLocaleString()} results
-                          </p>
-                        )}
-                        {query && (
-                          <button
-                            onClick={() => toggleSaveSearch(query)}
-                            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full transition-colors ml-auto ${
-                              isCurrentSaved
-                                ? "bg-cyan-100 text-cyan-600"
-                                : "bg-slate-100 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600"
-                            }`}
-                          >
-                            <Bookmark className={`w-3.5 h-3.5 ${isCurrentSaved ? "fill-current" : ""}`} />
-                            {isCurrentSaved ? "Saved" : "Save search"}
-                          </button>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
+            // Results page — ChatGPT-style thread layout
+            <>
+              {/* Compact top bar with new-thread + filter sidebar toggle */}
+              <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-white via-white/90 to-transparent h-14 pointer-events-none flex items-center justify-between px-6 lg:px-10">
+                <button
+                  onClick={() => {
+                    setQuery("");
+                    setResults(null);
+                    setSynthesis("");
+                    setFollowUps([]);
+                  }}
+                  className="pointer-events-auto flex items-center gap-2 text-sm text-slate-500 hover:text-cyan-600 transition-colors"
+                  title="New thread"
+                >
+                  <Logo size={18} />
+                  New thread
+                </button>
+                {isCurrentSaved ? (
+                  <button
+                    onClick={() => toggleSaveSearch(query)}
+                    className="pointer-events-auto text-xs px-3 py-1.5 rounded-full bg-cyan-100 text-cyan-600"
+                  >
+                    Saved ✓
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => toggleSaveSearch(query)}
+                    className="pointer-events-auto text-xs px-3 py-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600 transition-colors"
+                  >
+                    Save search
+                  </button>
+                )}
               </div>
-            </div>
+
+              <div className="flex-1 flex min-h-0">
+                {/* Thread view */}
+                <ThreadView
+                  query={query}
+                  mode={searchMode}
+                  searchCount={searchCount}
+                  synthesis={
+                    synthesis ||
+                    `Found ${results?.total.toLocaleString() || "matching"} papers for your question. ${
+                      searchMode !== "basic"
+                        ? "AI synthesis loading…"
+                        : "Turn on Pro for a synthesized answer."
+                    }`
+                  }
+                  synthesisLoading={synthesisLoading || isLoading}
+                  verdicts={verdicts}
+                  meterLoading={isLoading}
+                  papers={results?.papers || []}
+                  isLoadingPapers={isLoading}
+                  onAskFollowUp={handleAskFollowUp}
+                  followUps={followUps}
+                  followUpLoading={followUpLoading}
+                  onSelectPaper={setSelectedPaper}
+                  selectedPaperIds={new Set(selectedPapers.keys())}
+                  onToggleSelectPaper={(id, author, year, title) =>
+                    toggleSelectPaper(id, title, year, author)
+                  }
+                />
+              </div>
+
+              {/* Load more (inline at bottom of thread scroll) handled inside ThreadView; keep button here for parity */}
+              {results && results.papers.length < results.total && (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="hidden"
+                />
+              )}
+            </>
           )}
         </main>
 
@@ -475,6 +468,16 @@ export default function Home() {
             paper={selectedPaper}
             onClose={() => setSelectedPaper(null)}
           />
+        )}
+
+        {/* Floating error toast */}
+        {error && (
+          <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-40 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
+            <span>{error}</span>
+            <button onClick={() => query && doSearch(query, 0)}>
+              <RefreshCw className="w-3.5 h-3.5 hover:text-red-900" />
+            </button>
+          </div>
         )}
       </div>
     </div>

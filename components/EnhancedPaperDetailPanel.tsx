@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Paper } from "@/lib/types";
 import { formatAuthors } from "@/lib/utils";
 import { getCitations, getReferences, getRelatedPapers } from "@/lib/openalex";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CitationGraph } from "@/components/CitationGraph";
 import ChatWithPaper from "@/components/ChatWithPaper";
+import { extractStudySnapshot } from "@/lib/study-snapshot";
 import { BookMarked, MessageCircle } from "lucide-react";
 import {
   X,
@@ -93,6 +94,20 @@ export function EnhancedPaperDetailPanel({
   const [abstractExpanded, setAbstractExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [showChat, setShowChat] = useState(false);
+
+  // Study Snapshot — consensus.app's 7-field method summary
+  const snapshotFields = useMemo(() => {
+    const snap = extractStudySnapshot(paper);
+    const entries: [string, string][] = [];
+    if (snap.population) entries.push(["Population", snap.population]);
+    if (snap.sampleSize) entries.push(["Sample size", snap.sampleSize]);
+    if (snap.duration) entries.push(["Duration", snap.duration]);
+    if (snap.location) entries.push(["Location", snap.location]);
+    if (snap.methods) entries.push(["Methods", snap.methods]);
+    if (snap.outcomes) entries.push(["Outcomes", snap.outcomes]);
+    if (snap.results) entries.push(["Results", snap.results]);
+    return entries;
+  }, [paper.paperId, paper.abstract]);
 
   const [citations, setCitations] = useState<Citation[]>([]);
   const [references, setReferences] = useState<Citation[]>([]);
@@ -278,6 +293,29 @@ export function EnhancedPaperDetailPanel({
                         )}
                       </button>
                     )}
+                  </div>
+                )}
+
+                {/* Study Snapshot — 7-field table matching consensus.app */}
+                {snapshotFields.length > 0 && (
+                  <div className="rounded-xl border border-slate-200 overflow-hidden">
+                    <p className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
+                      Study Snapshot
+                    </p>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {snapshotFields.map(([field, value]) => (
+                          <tr key={field} className="border-b border-slate-100 last:border-0">
+                            <td className="px-4 py-2.5 text-xs font-semibold text-slate-400 w-28 align-top whitespace-nowrap">
+                              {field}
+                            </td>
+                            <td className="px-4 py-2.5 text-[13px] text-slate-700 leading-snug">
+                              {value}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
 
