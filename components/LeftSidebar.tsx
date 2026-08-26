@@ -20,21 +20,16 @@ export function LeftSidebar({
 }: LeftSidebarProps) {
   if (collapsed) {
     return (
-      <aside className="w-12 border-r border-slate-200 bg-white flex flex-col items-center py-4 gap-4 flex-shrink-0">
+      <aside className="w-[68px] border-r border-slate-200 bg-white flex flex-col items-center pt-3 flex-shrink-0" data-testid="sidebar-container">
         <Logo size={24} />
         <button
           onClick={onToggle}
-          className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
-          title="Expand sidebar"
+          className="mt-3 p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+          title="Open sidebar"
+          aria-label="Open sidebar"
+          data-testid="open-sidebar-button"
         >
           <PanelLeftClose className="w-4 h-4 rotate-180" />
-        </button>
-        <div className="w-7 h-px bg-slate-200" />
-        <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500" title="New Thread">
-          <Plus className="w-4 h-4" />
-        </button>
-        <button className="p-1.5 rounded-md hover:bg-slate-100 text-slate-500" title="Home">
-          <Home className="w-4 h-4" />
         </button>
       </aside>
     );

@@ -115,7 +115,7 @@ export default function Home() {
   const [selectedPaper, setSelectedPaper] = useState<(Paper & { aiFinding?: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchTime, setSearchTime] = useState<number | null>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [savedSearches, setSavedSearches] = useState<string[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
@@ -299,7 +299,7 @@ export default function Home() {
               <HeroSearchBar
                 onSearch={(q) => doSearch(q, 0)}
                 isLoading={isLoading}
-                corpus={corpus === "medical" ? "Medical" : "All research"}
+                corpus={corpus === "medical" ? "Medical" : "All papers"}
                 onCorpusChange={(c) =>
                   handleCorpusChange(c === "Medical" ? "medical" : "all")
                 }
@@ -307,19 +307,24 @@ export default function Home() {
                 onDeepChange={(d) =>
                   handleModeChange(d ? "deep" : "basic")
                 }
+                onQuickAction={() => {}}
               />
 
               <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-slate-500">
                 The new standard for academic research
               </p>
 
-              {/* Help button */}
-              <button
+              {/* Help button — links to consensus.app help (matches real app's support chat) */}
+              <a
+                href="https://help.consensus.app"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="fixed bottom-6 right-6 w-9 h-9 rounded-full bg-white border border-slate-200 shadow-sm hover:shadow-md flex items-center justify-center text-slate-500 transition-all"
                 title="Help"
+                aria-label="Open support chat"
               >
                 <HelpCircle className="w-4 h-4" />
-              </button>
+              </a>
             </div>
           ) : (
             // Results page

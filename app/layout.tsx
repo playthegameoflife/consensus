@@ -14,8 +14,9 @@ const sourceSerif = Source_Serif_4({
 });
 
 export const metadata: Metadata = {
-  title: "Consensus — AI Academic Search",
-  description: "Search across 200M+ academic papers and see the research consensus on any question.",
+  title: "Consensus: AI for Research",
+  description:
+    "Consensus is an AI academic search engine for peer-reviewed literature—your research OS for finding, organizing, and analyzing science 10x faster.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
