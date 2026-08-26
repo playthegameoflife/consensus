@@ -15,6 +15,7 @@ import {
 import { Paper } from "@/lib/types";
 import { PaperRow } from "./PaperRow";
 import { ConsensusMeter4Way, MeterVerdict, classifyVerdict } from "./ConsensusMeter4Way";
+import { CitationChip } from "./CitationChip";
 
 export interface FollowUpMessage {
   role: "user" | "assistant";
@@ -42,11 +43,12 @@ interface ThreadViewProps {
 
 /**
  * Parse inline [N] citations in the synthesis and render them as
- * clickable green chips like consensus.app.
+ * hover-card citation chips like consensus.app.
  */
 function renderSynthesisWithCitations(
   text: string,
-  paperCount: number
+  papers: (Paper & { aiFinding?: string })[],
+  onOpenDetails?: (paper: Paper) => void
 ): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   const regex = /\[(\d{1,2})\]/g;
@@ -62,18 +64,17 @@ function renderSynthesisWithCitations(
     lastIdx = 0;
     while ((match = regex.exec(para)) !== null) {
       const n = parseInt(match[1], 10);
-      if (n >= 1 && n <= paperCount + 30) {
+      const citedPaper = papers[n - 1];
+      if (citedPaper) {
         if (match.index > lastIdx) {
           nodes.push(para.slice(lastIdx, match.index));
         }
         nodes.push(
-          <button
+          <CitationChip
             key={`cite-${key++}`}
-            className="inline-flex items-center justify-center align-super mx-0.5 w-4 h-4 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-bold transition-colors"
-            title={`Citation ${n}`}
-          >
-            {n}
-          </button>
+            paper={citedPaper}
+            onOpenDetails={onOpenDetails}
+          />
         );
         lastIdx = match.index + match[0].length;
       }
@@ -200,7 +201,7 @@ export function ThreadView({
                 </div>
               ) : (
                 <div className="text-[15px] text-slate-700 mb-5">
-                  {renderSynthesisWithCitations(synthesis, papers.length)}
+                  {renderSynthesisWithCitations(synthesis, papers, onSelectPaper)}
                 </div>
               )}
 
@@ -277,7 +278,7 @@ export function ThreadView({
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 text-[15px] text-slate-700">
-                    {renderSynthesisWithCitations(msg.content, papers.length)}
+                    {renderSynthesisWithCitations(msg.content, papers, onSelectPaper)}
                   </div>
                 </div>
               )}

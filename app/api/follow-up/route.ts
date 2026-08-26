@@ -39,9 +39,31 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // consensus.app behavior: follow-ups that introduce new topics trigger a
+    // sub-search, and its results join the thread ("2 queries", "3 queries").
+    // Heuristic: always fetch fresh papers for the follow-up; the synthesis
+    // uses existing thread papers + new ones.
+    let newPapers: Paper[] = [];
+    let subSearchTotal = 0;
+    try {
+      const result = await searchPapers(query, 0, 10);
+      newPapers = result.papers;
+      subSearchTotal = result.total;
+    } catch {
+      // non-fatal: proceed with thread papers only
+    }
+
     // Build paper context from the thread (limit for token budget)
-    const paperContext = (papers || [])
-      .slice(0, 20)
+    const allPapers = [...(papers || []), ...newPapers];
+    const seen = new Set<string>();
+    const deduped = allPapers.filter((p) => {
+      if (seen.has(p.paperId)) return false;
+      seen.add(p.paperId);
+      return true;
+    });
+
+    const paperContext = deduped
+      .slice(0, 25)
       .map(
         (p, i) =>
           `[${i + 1}] ${p.title} (${p.year})${p.journal ? ` — ${p.journal}` : ""}\nAbstract: ${(p.abstract || "No abstract available.").slice(0, 500)}`
@@ -108,8 +130,8 @@ Respond with a focused answer (2-4 paragraphs, plain text with [N] citations). I
 
     return NextResponse.json({
       answer: answer || "No synthesis available.",
-      newPapers: [],
-      total: papers?.length || 0,
+      newPapers: newPapers,
+      total: deduped.length,
     });
   } catch (err) {
     console.error("Follow-up error:", err);

@@ -268,6 +268,24 @@ export default function Home() {
           data.error ||
           "Could not generate an answer — try rephrasing.";
 
+        // Merge any sub-search papers into the thread (consensus.app "2 queries")
+        if (data.newPapers?.length) {
+          setResults((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  papers: [
+                    ...prev.papers,
+                    ...data.newPapers.filter(
+                      (np: Paper) => !prev.papers.some((p) => p.paperId === np.paperId)
+                    ),
+                  ],
+                }
+              : prev
+          );
+          setSearchCount((c) => c + 1);
+        }
+
         setFollowUps((prev) => [
           ...prev,
           {
