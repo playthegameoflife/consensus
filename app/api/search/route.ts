@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
   const mode = searchParams.get("mode") || "fast"; // "fast" or "deep"
   const corpus = searchParams.get("corpus") as "all" | "medical" | null;
   const sortParam = searchParams.get("sort") as SortOrder | null;
+  const studyTypesParam = searchParams.get("studyTypes"); // comma-separated
+  const citationMin = parseInt(searchParams.get("citationMin") || "0", 10);
 
   if (!query.trim()) {
     return NextResponse.json({ papers: [], total: 0, offset: 0 });
@@ -39,6 +41,13 @@ export async function GET(req: NextRequest) {
     if (sortParam && ["relevance", "newest", "cited", "consensus"].includes(sortParam)) {
       filters.sort = sortParam as SortOrder;
     }
+    if (studyTypesParam) {
+      filters.publicationType = studyTypesParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    if (citationMin > 0) filters.citationCountMin = citationMin;
 
     const result = await searchPapers(query, offset, limit, filters);
 

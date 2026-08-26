@@ -186,32 +186,129 @@ export async function searchPapers(
     mailto: MAILTO,
   });
 
-  // Year range filter: "from_date" / "until_date" use YYYY-MM-DD
+  // Build filter list (OpenAlex takes comma-separated filters)
+  const filterParts: string[] = [];
+
+  // Year range — always cap the upper bound at the current year to filter out
+  // OpenAlex's known bad-data with future publication_year values.
+  const currentYear = new Date().getFullYear();
   if (filters?.yearRange) {
     const [start, end] = filters.yearRange;
-    params.set(
-      "filter",
-      `publication_year:${start}-${end}${
-        filters.openAccessOnly ? ",open_access.is_oa:true" : ""
-      }`
-    );
-  } else if (filters?.openAccessOnly) {
-    params.set("filter", "open_access.is_oa:true");
+    const safeEnd = Math.min(end, currentYear);
+    filterParts.push(`publication_year:${start}-${safeEnd}`);
+  } else if (filters?.year) {
+    const safeYear = Math.min(filters.year, currentYear);
+    filterParts.push(`publication_year:${safeYear}`);
+  } else {
+    filterParts.push(`publication_year:1900-${currentYear}`);
   }
-  if (filters?.year) {
-    params.append("filter", `publication_year:${filters.year}`);
+
+  // Open access
+  if (filters?.openAccessOnly) {
+    filterParts.push("open_access.is_oa:true");
   }
+
+  // Citation count minimum
+  if (filters?.citationCountMin !== undefined) {
+    filterParts.push(`cited_by_count:>${filters.citationCountMin}`);
+  }
+
+  // Study type → OpenAlex type filter. consensus.app's "RCT / Meta-Analysis /
+  // Review" labels don't map 1:1 to OpenAlex `type`; we approximate by combining
+  // the OpenAlex type filter with a title search for the canonical phrases.
+  if (filters?.publicationType && filters.publicationType.length > 0) {
+    const openAlexTypes: string[] = [];
+    const titleSearches: string[] = [];
+    for (const t of filters.publicationType) {
+      switch (t) {
+        case "Meta-Analysis":
+          titleSearches.push('"meta-analysis" OR "meta analysis"');
+          break;
+        case "Systematic Review":
+          titleSearches.push('"systematic review"');
+          break;
+        case "RCT":
+          titleSearches.push(
+            '"randomized controlled trial" OR "randomised controlled trial" OR "randomized clinical trial" OR "randomised clinical trial"'
+          );
+          break;
+        case "Clinical Trial":
+          titleSearches.push('"clinical trial"');
+          break;
+        case "Review":
+          openAlexTypes.push("review");
+          break;
+        case "Cross-Sectional":
+          titleSearches.push('"cross-sectional"');
+          break;
+        case "Cohort":
+          titleSearches.push('"cohort study"');
+          break;
+        case "Case-Control":
+          titleSearches.push('"case-control"');
+          break;
+        default:
+          break;
+      }
+    }
+    if (openAlexTypes.length) {
+      filterParts.push(`type:${openAlexTypes.join("|")}`);
+    }
+    if (titleSearches.length) {
+      // OpenAlex's title filter uses filter=title.search:<phrase>
+      // We OR phrases by using a regex-like syntax with the pipe
+      filterParts.push(`title.search:${titleSearches.join("|")}`);
+    }
+  }
+
+  // Medical Mode — scope to a curated list of top-tier medical journals
+  // (matches consensus.app's Medical Mode corpus). OpenAlex sources have
+  // stable IDs we can use.
   if (filters?.corpus === "medical") {
-    // consensus.app Medical mode = top-tier medical journals. OpenAlex doesn't
-    // have a built-in tier list, but we can scope to top medical concepts.
-    params.append(
-      "filter",
-      "concepts.id:C2778864810|C2996394920|C121332964|C70726800|C118543170|C524330487|C86800640"
+    const topMedicalJournals = [
+      // New England Journal of Medicine
+      "S62468778",
+      // The Lancet
+      "S49861241",
+      // JAMA
+      "S172573765",
+      // BMJ
+      "S4393911389",
+      // Annals of Internal Medicine
+      "S119722071",
+      // Nature Medicine
+      "S203256638",
+      // Cochrane Database of Systematic Reviews
+      "S4210172715",
+      // Circulation
+      "S116251202",
+      // European Heart Journal
+      "S181568219",
+      // Gastroenterology
+      "S143352558",
+      // Journal of Clinical Oncology
+      "S15137598",
+      // Diabetes Care
+      "S49878492",
+      // The Lancet Oncology / Neurology / Infectious Diseases
+      "S116900674",
+      "S70053155",
+      "S23772524",
+    ];
+    // Use primary_location.source.id filter for top journals
+    filterParts.push(
+      `primary_location.source.id:${topMedicalJournals.join("|")}`
     );
   }
 
-  // Sort: relevance (default), newest → publication_date:desc, cited → cited_by_count:desc
-  if (filters?.sort === "newest") params.set("sort", "publication_date:desc");
+  if (filterParts.length) {
+    params.set("filter", filterParts.join(","));
+  }
+
+  // Sort: relevance (default), newest → publication_year:desc, cited → cited_by_count:desc
+  // (publication_year is more reliable than publication_date — OpenAlex has
+  // many future-dated publication_date values.)
+  if (filters?.sort === "newest") params.set("sort", "publication_year:desc");
   else if (filters?.sort === "cited")
     params.set("sort", "cited_by_count:desc");
 

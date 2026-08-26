@@ -3,12 +3,15 @@
 import { useState, useCallback, useEffect } from "react";
 import { Logo } from "@/components/Logo";
 import { LeftSidebar } from "@/components/LeftSidebar";
-import { HeroSearchBar } from "@/components/HeroSearchBar";
+import { SearchBar } from "@/components/SearchBar";
 import { PaperCard } from "@/components/PaperCard";
 import { ConsensusMeter } from "@/components/ConsensusMeter";
 import { FilterSidebar, Filters } from "@/components/FilterSidebar";
 import { EnhancedPaperDetailPanel } from "@/components/EnhancedPaperDetailPanel";
 import { SearchHistory, addToHistory } from "@/components/SearchHistory";
+import { Corpus as CorpusType } from "@/components/MedicalModeToggle";
+import { SearchMode as SearchModeType } from "@/components/SearchModeToggle";
+import { HeroSearchBar } from "@/components/HeroSearchBar";
 import { Paper } from "@/lib/types";
 import { Loader2, Search, ArrowUp, ArrowDown, Minus, Clock, Bookmark, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -23,15 +26,22 @@ interface SearchResult {
 function ConsensusSummary({ papers }: { papers: SearchResult["papers"] }) {
   if (!papers.length) return null;
 
-  const scores = papers
-    .map((p) => p.consensusScore)
-    .filter((s): s is number => s !== undefined);
+  // Compute consensus scores client-side if not provided (uses Jaccard
+  // similarity over AI findings / abstracts to mirror consensus.app's meter).
+  const scores = (
+    papers[0].consensusScore !== undefined
+      ? papers.map((p) => p.consensusScore!)
+      : computeLocalConsensusScores(papers)
+  ).filter((s): s is number => s !== undefined && Number.isFinite(s));
 
   if (!scores.length) return null;
 
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const agreeing = scores.filter((s) => s > 0.5).length;
-  const disagreeing = scores.filter((s) => s < -0.3).length;
+  const agreeing = scores.filter((s) => s > 0.3).length;
+  const disagreeing = scores.filter((s) => s < -0.15).length;
+  const mixed = scores.length - agreeing - disagreeing;
+  const verdict =
+    avg > 0.4 ? "Mostly agree" : avg < -0.15 ? "Mostly disagree" : "Mixed evidence";
 
   return (
     <div className="mb-5 p-4 bg-white rounded-2xl border border-slate-200">
@@ -48,12 +58,44 @@ function ConsensusSummary({ papers }: { papers: SearchResult["papers"] }) {
           </div>
           <div className="flex items-center gap-1.5 text-slate-400">
             <Minus className="w-4 h-4" />
-            <span>{scores.length - agreeing - disagreeing} mixed</span>
+            <span>{mixed} mixed</span>
           </div>
+          <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+            {verdict}
+          </span>
         </div>
       </div>
     </div>
   );
+}
+
+/** Client-side Jaccard consensus score (cheap, no LLM). */
+function computeLocalConsensusScores(
+  papers: SearchResult["papers"]
+): number[] {
+  const texts = papers.map((p) =>
+    (p.aiFinding || p.abstract || "").toLowerCase()
+  );
+  const tokenSets = texts.map((t) => new Set(t.split(/\W+/).filter((w) => w.length > 3)));
+  const scores: number[] = [];
+
+  for (let i = 0; i < papers.length; i++) {
+    if (!tokenSets[i].size) {
+      scores.push(0);
+      continue;
+    }
+    let totalSim = 0;
+    let count = 0;
+    for (let j = 0; j < papers.length; j++) {
+      if (i === j) continue;
+      const inter = new Set([...tokenSets[i]].filter((w) => tokenSets[j].has(w)));
+      const union = new Set([...tokenSets[i], ...tokenSets[j]]);
+      totalSim += union.size > 0 ? inter.size / union.size : 0;
+      count++;
+    }
+    scores.push(count > 0 ? (totalSim - 0.5) * 2 : 0); // remap to ~-1..1
+  }
+  return scores;
 }
 
 export default function Home() {
@@ -66,18 +108,24 @@ export default function Home() {
     studyTypes: [],
     openAccessOnly: false,
     citationMin: 0,
+    sort: "relevance",
   });
+  const [corpus, setCorpus] = useState<CorpusType>("all");
+  const [searchMode, setSearchMode] = useState<SearchModeType>("basic");
   const [selectedPaper, setSelectedPaper] = useState<(Paper & { aiFinding?: string }) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchTime, setSearchTime] = useState<number | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [savedSearches, setSavedSearches] = useState<string[]>([]);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
-  // Load saved searches
+  // Load saved searches + search history
   useEffect(() => {
     try {
       const stored = localStorage.getItem("consensus_saved_searches");
       if (stored) setSavedSearches(JSON.parse(stored));
+      const hist = localStorage.getItem("consensus_search_history");
+      if (hist) setSearchHistory(JSON.parse(hist));
     } catch {}
   }, []);
 
@@ -104,6 +152,12 @@ export default function Home() {
         setQuery(q);
         setIsLoading(true);
         setSearchTime(null);
+        // Add to local history
+        const next = [q, ...searchHistory.filter((h) => h !== q)].slice(0, 12);
+        setSearchHistory(next);
+        try {
+          localStorage.setItem("consensus_search_history", JSON.stringify(next));
+        } catch {}
         addToHistory(q);
       } else {
         setIsLoadingMore(true);
@@ -111,16 +165,33 @@ export default function Home() {
       setError(null);
 
       try {
+        const limit =
+          searchMode === "deep" ? 20 : searchMode === "pro" ? 15 : 10;
         const params = new URLSearchParams({
           q,
           offset: String(offset),
-          limit: "10",
+          limit: String(limit),
         });
-        if (filters.yearRange[0] !== 1900 || filters.yearRange[1] !== 2026) {
+        if (
+          filters.yearRange[0] !== 1900 ||
+          filters.yearRange[1] !== 2026
+        ) {
           params.set("yearRange", filters.yearRange.join("-"));
         }
         if (filters.openAccessOnly) {
           params.set("openAccess", "true");
+        }
+        if (filters.studyTypes.length > 0) {
+          params.set("studyTypes", filters.studyTypes.join(","));
+        }
+        if (filters.citationMin > 0) {
+          params.set("citationMin", String(filters.citationMin));
+        }
+        if (filters.sort && filters.sort !== "relevance") {
+          params.set("sort", filters.sort);
+        }
+        if (corpus === "medical") {
+          params.set("corpus", "medical");
         }
 
         const res = await fetch(`/api/search?${params}`);
@@ -130,11 +201,14 @@ export default function Home() {
         setSearchTime(Date.now() - startTime);
 
         setResults((prev) => {
-          if (offset === 0) return data;
-          return {
-            ...data,
-            papers: [...(prev?.papers || []), ...data.papers],
-          };
+          const merged =
+            offset === 0
+              ? data
+              : {
+                  ...data,
+                  papers: [...(prev?.papers || []), ...data.papers],
+                };
+          return merged;
         });
       } catch (err) {
         setError("Something went wrong. Please try again.");
@@ -144,8 +218,33 @@ export default function Home() {
         setIsLoadingMore(false);
       }
     },
-    [filters]
+    [filters, corpus, searchMode, searchHistory]
   );
+
+  const handleCorpusChange = useCallback(
+    (newCorpus: CorpusType) => {
+      setCorpus(newCorpus);
+      if (query) {
+        doSearch(query, 0);
+      }
+    },
+    [query, doSearch]
+  );
+
+  const handleModeChange = useCallback(
+    (newMode: SearchModeType) => {
+      setSearchMode(newMode);
+      if (query) {
+        doSearch(query, 0);
+      }
+    },
+    [query, doSearch]
+  );
+
+  useEffect(() => {
+    if (query) doSearch(query, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, corpus, searchMode]);
 
   const handleLoadMore = useCallback(() => {
     if (results && !isLoadingMore) {
@@ -160,6 +259,14 @@ export default function Home() {
       <LeftSidebar
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed((v) => !v)}
+        recentSearches={searchHistory}
+        onSelectSearch={(q) => doSearch(q, 0)}
+        onClearSearches={() => {
+          setSearchHistory([]);
+          try {
+            localStorage.removeItem("consensus_search_history");
+          } catch {}
+        }}
       />
 
       {/* Main area */}
@@ -189,7 +296,18 @@ export default function Home() {
                 Research starts here
               </h1>
 
-              <HeroSearchBar onSearch={(q) => doSearch(q, 0)} isLoading={isLoading} />
+              <HeroSearchBar
+                onSearch={(q) => doSearch(q, 0)}
+                isLoading={isLoading}
+                corpus={corpus === "medical" ? "Medical" : "All research"}
+                onCorpusChange={(c) =>
+                  handleCorpusChange(c === "Medical" ? "medical" : "all")
+                }
+                deep={searchMode !== "basic"}
+                onDeepChange={(d) =>
+                  handleModeChange(d ? "deep" : "basic")
+                }
+              />
 
               <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-slate-500">
                 The new standard for academic research

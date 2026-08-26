@@ -1,15 +1,23 @@
 "use client";
 
-import { useState } from "react";
 import { Logo } from "./Logo";
-import { Plus, Home, PanelLeftClose } from "lucide-react";
+import { Plus, Home, PanelLeftClose, Clock, X } from "lucide-react";
 
 interface LeftSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  recentSearches?: string[];
+  onSelectSearch?: (q: string) => void;
+  onClearSearches?: () => void;
 }
 
-export function LeftSidebar({ collapsed, onToggle }: LeftSidebarProps) {
+export function LeftSidebar({
+  collapsed,
+  onToggle,
+  recentSearches = [],
+  onSelectSearch,
+  onClearSearches,
+}: LeftSidebarProps) {
   if (collapsed) {
     return (
       <aside className="w-12 border-r border-slate-200 bg-white flex flex-col items-center py-4 gap-4 flex-shrink-0">
@@ -74,6 +82,38 @@ export function LeftSidebar({ collapsed, onToggle }: LeftSidebarProps) {
           ⏱️
         </p>
       </div>
+
+      {/* Recent searches */}
+      {recentSearches.length > 0 && (
+        <div className="px-5 pb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              Recent
+            </h3>
+            {onClearSearches && (
+              <button
+                onClick={onClearSearches}
+                className="text-[11px] text-slate-400 hover:text-slate-600"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <div className="space-y-0.5">
+            {recentSearches.slice(0, 8).map((q, i) => (
+              <button
+                key={i}
+                onClick={() => onSelectSearch?.(q)}
+                className="w-full text-left px-2 py-1 text-[13px] text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded truncate transition-colors"
+                title={q}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="p-4 space-y-2 border-t border-slate-100">
         <button className="w-full py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-full transition-colors">

@@ -6,25 +6,48 @@ import { Plus, ChevronDown, Sparkles, SlidersHorizontal, ArrowRight, Mic } from 
 interface HeroSearchBarProps {
   onSearch: (query: string) => void;
   isLoading?: boolean;
+  corpus?: string;
+  onCorpusChange?: (corpus: string) => void;
+  deep?: boolean;
+  onDeepChange?: (deep: boolean) => void;
 }
 
-const CORPUS_OPTIONS = ["All research", "Medical", "Life Sciences", "Computer Science"];
+const CORPUS_OPTIONS = ["All research", "Medical"];
 const QUICK_ACTIONS = [
   { icon: "📊", label: "Draft a report" },
   { icon: "✦", label: "Find the Consensus" },
   { icon: "🔬", label: "Find studies by method" },
 ];
 
-export function HeroSearchBar({ onSearch, isLoading = false }: HeroSearchBarProps) {
+export function HeroSearchBar({
+  onSearch,
+  isLoading = false,
+  corpus: corpusProp = "All research",
+  onCorpusChange,
+  deep: deepProp = false,
+  onDeepChange,
+}: HeroSearchBarProps) {
   const [query, setQuery] = useState("");
   const [corpusOpen, setCorpusOpen] = useState(false);
-  const [corpus, setCorpus] = useState("All research");
-  const [deep, setDeep] = useState(false);
+  const [corpus, setCorpus] = useState(corpusProp);
+  const [deep, setDeep] = useState(deepProp);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = () => {
     if (!query.trim() || isLoading) return;
     onSearch(query.trim());
+  };
+
+  const handleCorpus = (c: string) => {
+    setCorpus(c);
+    setCorpusOpen(false);
+    onCorpusChange?.(c);
+  };
+
+  const handleDeep = () => {
+    const next = !deep;
+    setDeep(next);
+    onDeepChange?.(next);
   };
 
   return (
@@ -57,10 +80,7 @@ export function HeroSearchBar({ onSearch, isLoading = false }: HeroSearchBarProp
                 {CORPUS_OPTIONS.map((opt) => (
                   <button
                     key={opt}
-                    onClick={() => {
-                      setCorpus(opt);
-                      setCorpusOpen(false);
-                    }}
+                    onClick={() => handleCorpus(opt)}
                     className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
                       opt === corpus ? "text-cyan-600 font-medium" : "text-slate-700"
                     }`}
@@ -75,7 +95,7 @@ export function HeroSearchBar({ onSearch, isLoading = false }: HeroSearchBarProp
           {/* Deep pill */}
           <button
             type="button"
-            onClick={() => setDeep((v) => !v)}
+            onClick={handleDeep}
             className={`flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-lg transition-all ${
               deep
                 ? "bg-cyan-50 text-cyan-700 border border-cyan-200"
