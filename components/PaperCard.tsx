@@ -34,10 +34,10 @@ const STUDY_COLORS: Record<string, string> = {
 }
 
 function CollectionPicker({
-  paperId,
+  paper,
   onClose,
 }: {
-  paperId: string
+  paper: Paper
   onClose: () => void
 }) {
   const [collections, setCollections] = useState<Collection[]>(getCollections)
@@ -49,27 +49,27 @@ function CollectionPicker({
   }
 
   function handleAdd(colId: string) {
-    addPaperToCollection(colId, paperId)
+    addPaperToCollection(colId, paper)
     refresh()
     onClose()
   }
 
   function handleRemove(colId: string) {
-    removePaperFromCollection(colId, paperId)
+    removePaperFromCollection(colId, paper.paperId)
     refresh()
   }
 
   function handleCreate() {
     if (!newName.trim()) return
     const col = createCollection(newName.trim())
-    addPaperToCollection(col.id, paperId)
+    addPaperToCollection(col.id, paper)
     setNewName('')
     setCreating(false)
     refresh()
     onClose()
   }
 
-  const inCollections = collections.filter(c => c.paperIds.includes(paperId))
+  const inCollections = collections.filter(c => c.paperIds.includes(paper.paperId))
 
   return (
     <div className="w-64 p-2">
@@ -131,7 +131,7 @@ function Plus({ className }: { className?: string }) {
   )
 }
 
-function SaveButton({ paperId, saved }: { paperId: string; saved: boolean }) {
+function SaveButton({ paper, saved }: { paper: Paper; saved: boolean }) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -152,7 +152,7 @@ function SaveButton({ paperId, saved }: { paperId: string; saved: boolean }) {
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={4} className="p-0 overflow-hidden z-[9999]">
-        <CollectionPicker paperId={paperId} onClose={() => setOpen(false)} />
+        <CollectionPicker paper={paper} onClose={() => setOpen(false)} />
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -312,7 +312,7 @@ export function PaperCard({ paper, onSelect }: PaperCardProps) {
   return (
     <Card className="p-5 hover:shadow-md transition-shadow duration-200 group relative">
       {/* Save button */}
-      <SaveButton paperId={paper.paperId} saved={saved} />
+      <SaveButton paper={paper} saved={saved} />
 
       {/* Clickable card body */}
       <div onClick={() => onSelect?.(paper)} className="cursor-pointer">

@@ -1,26 +1,29 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BookMarked, Plus, Trash2, Edit2, X, Check, FolderOpen } from 'lucide-react'
+import { BookMarked, Plus, Trash2, Edit2, X, Check, FolderOpen, Download } from 'lucide-react'
 import {
   getCollections, createCollection, deleteCollection, renameCollection,
-  removePaperFromCollection, Collection,
+  removePaperFromCollection, getCollectionPapers, Collection,
 } from '@/lib/collections'
 import { Paper } from '@/lib/types'
+import { paperToBibtex } from '@/lib/collections'
 
 interface CollectionsPanelProps {
-  papers: Paper[]
+  papers?: Paper[] // optional: current-thread papers to attach
   currentPaperId?: string
   onClose?: () => void
+  onOpenPaper?: (paper: Paper) => void
 }
 
-export default function CollectionsPanel({ papers, currentPaperId, onClose }: CollectionsPanelProps) {
+export default function CollectionsPanel({ papers = [], currentPaperId, onClose, onOpenPaper }: CollectionsPanelProps) {
   const [collections, setCollections] = useState<Collection[]>([])
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     setCollections(getCollections())
@@ -59,8 +62,30 @@ export default function CollectionsPanel({ papers, currentPaperId, onClose }: Co
     refresh()
   }
 
+  /** Papers in a collection: stored snapshots first, fall back to thread papers. */
   function getPapersForCollection(collection: Collection): Paper[] {
+    const stored = getCollectionPapers(collection.id)
+    if (stored.length > 0) return stored
     return papers.filter(p => collection.paperIds.includes(p.paperId))
+  }
+
+  async function handleExportBibtex(col: Collection) {
+    const colPapers = getPapersForCollection(col)
+    const bib = colPapers.map(p => paperToBibtex(p)).join('\n\n')
+    try {
+      await navigator.clipboard.writeText(bib)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // fallback: download as file
+      const blob = new Blob([bib], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${col.name.replace(/\s+/g, '-').toLowerCase()}.bib`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
   }
 
   const colorMap: Record<string, string> = {

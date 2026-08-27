@@ -16,6 +16,8 @@ import { Paper } from "@/lib/types";
 import { PaperRow } from "./PaperRow";
 import { ConsensusMeter4Way, MeterVerdict, classifyVerdict } from "./ConsensusMeter4Way";
 import { CitationChip } from "./CitationChip";
+import { RelatedSearches } from "./RelatedSearches";
+import { ResultsTimeline } from "./ResultsTimeline";
 
 export interface FollowUpMessage {
   role: "user" | "assistant";
@@ -49,6 +51,9 @@ interface ThreadViewProps {
   onSelectPaper: (paper: Paper) => void;
   selectedPaperIds: Set<string>;
   onToggleSelectPaper: (paperId: string, title: string, year: number, author: string) => void;
+  savedPaperIds?: Set<string>;
+  onToggleSavePaper?: (paper: Paper) => void;
+  onSearch?: (q: string) => void;
 }
 
 /**
@@ -126,6 +131,9 @@ export function ThreadView({
   onSelectPaper,
   selectedPaperIds,
   onToggleSelectPaper,
+  savedPaperIds,
+  onToggleSavePaper,
+  onSearch,
 }: ThreadViewProps) {
   const [followInput, setFollowInput] = useState("");
   const [copied, setCopied] = useState(false);
@@ -333,6 +341,8 @@ export function ThreadView({
                       paper.title
                     )
                   }
+                  saved={savedPaperIds?.has(paper.paperId) ?? false}
+                  onToggleSave={onToggleSavePaper ? () => onToggleSavePaper(paper) : undefined}
                 />
               ))}
             </div>
@@ -366,6 +376,20 @@ export function ThreadView({
                 <Sparkles className="w-4 h-4 text-white animate-pulse" />
               </div>
               <div className="text-sm text-slate-400 pt-1.5">Thinking…</div>
+            </div>
+          )}
+
+          {/* Results timeline (publication-year distribution) */}
+          {papers.length > 0 && !isLoadingPapers && (
+            <div className="mt-10">
+              <ResultsTimeline papers={papers} onSelect={onSelectPaper} />
+            </div>
+          )}
+
+          {/* Related searches */}
+          {papers.length > 0 && !isLoadingPapers && onSearch && (
+            <div className="mt-8">
+              <RelatedSearches query={query} papers={papers} onSearch={onSearch} />
             </div>
           )}
 

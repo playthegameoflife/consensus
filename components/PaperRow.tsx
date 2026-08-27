@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, MessageSquare, BookOpen, Layers, Check } from "lucide-react";
+import { Eye, MessageSquare, BookOpen, Layers, Check, Bookmark } from "lucide-react";
 import { Paper } from "@/lib/types";
 import { extractKeyTakeaway, getQualityBadges } from "@/lib/paper-insights";
 
@@ -10,6 +10,8 @@ interface PaperRowProps {
   onSelect: () => void;
   selected: boolean;
   onToggleSelect: () => void;
+  saved?: boolean;
+  onToggleSave?: () => void;
 }
 
 const BADGE_ICONS = {
@@ -25,6 +27,8 @@ export function PaperRow({
   onSelect,
   selected,
   onToggleSelect,
+  saved = false,
+  onToggleSave,
 }: PaperRowProps) {
   const takeaway = extractKeyTakeaway(paper);
   const badges = getQualityBadges(paper);
@@ -94,20 +98,39 @@ export function PaperRow({
       </div>
 
       {/* Select checkbox (chat-with-paper multi-select) */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleSelect();
-        }}
-        aria-label={selected ? "Deselect paper" : "Select paper"}
-        className={`self-start flex-shrink-0 w-5 h-5 mt-1 rounded-md border flex items-center justify-center transition-colors ${
-          selected
-            ? "bg-cyan-500 border-cyan-500 text-white"
-            : "border-slate-300 hover:border-cyan-400 bg-white"
-        }`}
-      >
-        {selected && <Check className="w-3.5 h-3.5" />}
-      </button>
+      <div className="flex flex-col items-center gap-2 self-start flex-shrink-0 mt-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleSelect();
+          }}
+          aria-label={selected ? "Deselect paper" : "Select paper"}
+          className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+            selected
+              ? "bg-cyan-500 border-cyan-500 text-white"
+              : "border-slate-300 hover:border-cyan-400 bg-white"
+          }`}
+        >
+          {selected && <Check className="w-3.5 h-3.5" />}
+        </button>
+        {onToggleSave && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSave();
+            }}
+            aria-label={saved ? "Remove from library" : "Save to library"}
+            title={saved ? "Remove from library" : "Save to library"}
+            className={`w-5 h-5 rounded-md flex items-center justify-center transition-colors ${
+              saved
+                ? "text-cyan-500 bg-cyan-50"
+                : "text-slate-300 hover:text-cyan-400 hover:bg-slate-50"
+            }`}
+          >
+            <Bookmark className={`w-3.5 h-3.5 ${saved ? "fill-current" : ""}`} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

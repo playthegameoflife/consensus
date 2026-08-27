@@ -1,7 +1,7 @@
 "use client";
 
 import { Logo } from "./Logo";
-import { Plus, Home, PanelLeftClose, Clock, X } from "lucide-react";
+import { Plus, Home, PanelLeftClose, Clock, X, BookMarked } from "lucide-react";
 
 interface LeftSidebarProps {
   collapsed: boolean;
@@ -9,6 +9,8 @@ interface LeftSidebarProps {
   recentSearches?: string[];
   onSelectSearch?: (q: string) => void;
   onClearSearches?: () => void;
+  onOpenLibrary?: () => void;
+  libraryCount?: number;
 }
 
 export function LeftSidebar({
@@ -17,6 +19,8 @@ export function LeftSidebar({
   recentSearches = [],
   onSelectSearch,
   onClearSearches,
+  onOpenLibrary,
+  libraryCount = 0,
 }: LeftSidebarProps) {
   if (collapsed) {
     return (
@@ -31,6 +35,16 @@ export function LeftSidebar({
         >
           <PanelLeftClose className="w-4 h-4 rotate-180" />
         </button>
+        {onOpenLibrary && (
+          <button
+            onClick={onOpenLibrary}
+            className="mt-3 p-1.5 rounded-md hover:bg-slate-100 text-slate-500"
+            title="My Library"
+            aria-label="My Library"
+          >
+            <BookMarked className="w-4 h-4" />
+          </button>
+        )}
       </aside>
     );
   }
@@ -57,6 +71,21 @@ export function LeftSidebar({
           <Home className="w-3.5 h-3.5" />
           Home
         </button>
+        {onOpenLibrary && (
+          <button
+            onClick={onOpenLibrary}
+            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-md transition-colors"
+            title="My Library"
+          >
+            <BookMarked className="w-3.5 h-3.5" />
+            My Library
+            {libraryCount > 0 && (
+              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-50 text-cyan-600 font-semibold">
+                {libraryCount}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       <div className="px-5 py-6 flex-1">

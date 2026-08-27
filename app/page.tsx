@@ -9,6 +9,7 @@ import { SearchHistory, addToHistory } from "@/components/SearchHistory";
 import { Corpus as CorpusType } from "@/components/MedicalModeToggle";
 import { SearchMode as SearchModeType } from "@/components/SearchModeToggle";
 import { HeroSearchBar } from "@/components/HeroSearchBar";
+import CollectionsPanel from "@/components/CollectionsPanel";
 import {
   ThreadView,
   FollowUpMessage,
@@ -18,6 +19,14 @@ import {
   classifyVerdict,
 } from "@/components/ConsensusMeter4Way";
 import { Paper } from "@/lib/types";
+import {
+  getLibraryPapers,
+  getCollections,
+  createCollection,
+  isPaperInAnyCollection,
+  addPaperToCollection,
+  removePaperFromCollection,
+} from "@/lib/collections";
 import { HelpCircle, Search, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 interface SearchResult {
@@ -77,6 +86,10 @@ export default function Home() {
 
   // Multi-select for "ask these papers"
   const [selectedPapers, setSelectedPapers] = useState<Map<string, { title: string; author: string; year: number }>>(new Map());
+
+  // My Library (Collections)
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryVersion, setLibraryVersion] = useState(0);
 
   // Load saved searches + search history
   useEffect(() => {
@@ -378,6 +391,36 @@ export default function Home() {
     }
   }, [results, isLoadingMore, query, doSearch]);
 
+  /** Toggle a paper's library membership. First collection gets it. */
+  const handleToggleSavePaper = useCallback(
+    (paper: Paper) => {
+      if (isPaperInAnyCollection(paper.paperId)) {
+        // Remove from all collections (it's in the library)
+        for (const col of getCollections()) {
+          if (col.paperIds.includes(paper.paperId)) {
+            removePaperFromCollection(col.id, paper.paperId);
+          }
+        }
+      } else {
+        // Add to first collection, or create one if none exist
+        const cols = getCollections();
+        if (cols.length > 0) {
+          addPaperToCollection(cols[0].id, paper);
+        } else {
+          const col = createCollection("My Library");
+          addPaperToCollection(col.id, paper);
+        }
+      }
+      setLibraryVersion((v) => v + 1);
+    },
+    []
+  );
+
+  const libraryPapers = useMemo(() => {
+    void libraryVersion; // re-evaluate when library changes
+    return getLibraryPapers();
+  }, [libraryVersion]);
+
   return (
     <div className="h-screen overflow-hidden bg-white flex">
       {/* Left sidebar */}
@@ -392,6 +435,8 @@ export default function Home() {
             localStorage.removeItem("consensus_search_history");
           } catch {}
         }}
+        onOpenLibrary={() => setLibraryOpen(true)}
+        libraryCount={libraryPapers.length}
       />
 
       {/* Main area */}
@@ -548,6 +593,9 @@ export default function Home() {
                   onToggleSelectPaper={(id, author, year, title) =>
                     toggleSelectPaper(id, title, year, author)
                   }
+                  savedPaperIds={new Set(libraryPapers.map((p) => p.paperId))}
+                  onToggleSavePaper={handleToggleSavePaper}
+                  onSearch={(q) => doSearch(q, 0)}
                 />
               </div>
 
@@ -569,6 +617,26 @@ export default function Home() {
             paper={selectedPaper}
             onClose={() => setSelectedPaper(null)}
           />
+        )}
+
+        {/* My Library overlay */}
+        {libraryOpen && (
+          <div className="fixed inset-0 z-40">
+            <div
+              className="absolute inset-0 bg-black/30 animate-fade-in"
+              onClick={() => setLibraryOpen(false)}
+            />
+            <div className="absolute right-0 top-0 bottom-0 w-full max-w-lg bg-white shadow-2xl overflow-y-auto animate-slide-in-right">
+              <CollectionsPanel
+                papers={results?.papers || []}
+                onClose={() => setLibraryOpen(false)}
+                onOpenPaper={(p) => {
+                  setSelectedPaper(p);
+                  setLibraryOpen(false);
+                }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Floating error toast */}
