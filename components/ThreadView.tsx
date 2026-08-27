@@ -18,6 +18,7 @@ import { ConsensusMeter4Way, MeterVerdict, classifyVerdict } from "./ConsensusMe
 import { CitationChip } from "./CitationChip";
 import { RelatedSearches } from "./RelatedSearches";
 import { ResultsTimeline } from "./ResultsTimeline";
+import { GateOverlay } from "./GateOverlay";
 
 export interface FollowUpMessage {
   role: "user" | "assistant";
@@ -54,6 +55,7 @@ interface ThreadViewProps {
   savedPaperIds?: Set<string>;
   onToggleSavePaper?: (paper: Paper) => void;
   onSearch?: (q: string) => void;
+  devGate?: boolean;
 }
 
 /**
@@ -134,6 +136,7 @@ export function ThreadView({
   savedPaperIds,
   onToggleSavePaper,
   onSearch,
+  devGate = false,
 }: ThreadViewProps) {
   const [followInput, setFollowInput] = useState("");
   const [copied, setCopied] = useState(false);
@@ -241,8 +244,10 @@ export function ThreadView({
                 </div>
               </div>
 
-              {/* Synthesis */}
-              {synthesisLoading ? (
+              {/* Synthesis — gated when devGate is on (preview of consensus.app paywall) */}
+              {devGate && (mode === "pro" || mode === "deep") ? (
+                <GateOverlay feature={mode === "deep" ? "deep" : "pro"} />
+              ) : synthesisLoading ? (
                 <div className="animate-pulse space-y-2 mb-5">
                   <div className="h-3 bg-slate-100 rounded w-full" />
                   <div className="h-3 bg-slate-100 rounded w-11/12" />
@@ -260,7 +265,9 @@ export function ThreadView({
               {/* Research Agent block — plan → searches → cited report */}
               {mode === "agent" && (
                 <div className="mb-5">
-                  {agentLoading && !agentResult ? (
+                  {devGate ? (
+                    <GateOverlay feature="agent" />
+                  ) : agentLoading && !agentResult ? (
                     <div className="animate-pulse space-y-2">
                       <div className="h-3 bg-slate-100 rounded w-1/2" />
                       <div className="h-3 bg-slate-100 rounded w-2/3" />
@@ -319,11 +326,15 @@ export function ThreadView({
               {/* 4-way Consensus Meter — only for Pro/Deep where per-paper
                   AI findings exist (agent mode has the Research Report instead) */}
               {(mode === "pro" || mode === "deep") && (
-                <ConsensusMeter4Way
-                  verdicts={verdicts}
-                  query={query}
-                  loading={meterLoading}
-                />
+                devGate ? (
+                  <GateOverlay feature={mode === "deep" ? "deep" : "pro"} compact />
+                ) : (
+                  <ConsensusMeter4Way
+                    verdicts={verdicts}
+                    query={query}
+                    loading={meterLoading}
+                  />
+                )
               )}
             </div>
           </div>

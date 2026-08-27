@@ -27,6 +27,7 @@ import {
   addPaperToCollection,
   removePaperFromCollection,
 } from "@/lib/collections";
+import { isDevGateEnabled, initDevGateFromUrl } from "@/lib/gate";
 import { HelpCircle, Search, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 interface SearchResult {
@@ -91,6 +92,13 @@ export default function Home() {
   // My Library (Collections)
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryVersion, setLibraryVersion] = useState(0);
+
+  // Dev-only paywall preview toggle (off by default)
+  const [devGate, setDevGate] = useState(false);
+  useEffect(() => {
+    initDevGateFromUrl();
+    setDevGate(isDevGateEnabled());
+  }, []);
 
   // Load saved searches + search history
   useEffect(() => {
@@ -608,6 +616,7 @@ export default function Home() {
                   savedPaperIds={new Set(libraryPapers.map((p) => p.paperId))}
                   onToggleSavePaper={handleToggleSavePaper}
                   onSearch={(q) => doSearch(q, 0)}
+                  devGate={devGate}
                 />
               </div>
 
