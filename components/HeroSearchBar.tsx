@@ -17,12 +17,14 @@ interface HeroSearchBarProps {
   onCorpusChange?: (corpus: string) => void;
   deep?: boolean;
   onDeepChange?: (deep: boolean) => void;
+  onAgentChange?: (agent: boolean) => void;
 }
 
 export type QuickAction =
   | { type: "chat-library" }
   | { type: "method" }
-  | { type: "comparison" };
+  | { type: "comparison" }
+  | { type: "research-agent" };
 
 const CORPUS_OPTIONS = ["All papers", "Medical"];
 
@@ -50,6 +52,12 @@ const QUICK_ACTIONS: {
     action: { type: "comparison" },
     template: "Create a comparison table of ",
   },
+  {
+    icon: "🤖",
+    label: "Research Agent",
+    action: { type: "research-agent" },
+    template: "Research: ",
+  },
 ];
 
 export function HeroSearchBar({
@@ -59,11 +67,13 @@ export function HeroSearchBar({
   onCorpusChange,
   deep: deepProp = false,
   onDeepChange,
+  onAgentChange,
 }: HeroSearchBarProps) {
   const [query, setQuery] = useState("");
   const [corpusOpen, setCorpusOpen] = useState(false);
   const [corpus, setCorpus] = useState(corpusProp);
   const [deep, setDeep] = useState(deepProp);
+  const [agent, setAgent] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Sync local state when the parent changes the prop (e.g. quick action
@@ -97,11 +107,18 @@ export function HeroSearchBar({
     template: string
   ) => {
     // consensus.app behavior: a quick action pre-fills a prompt template and
-    // enables Pro — it does NOT run a literal search for the chip label.
+    // enables the relevant mode — it does NOT run a literal search for the chip label.
     setQuery(template);
-    setDeep(true);
+    if (action.type === "research-agent") {
+      // Research Agent mode: planning + multi-search + cited report
+      setAgent(true);
+      setDeep(true);
+      onAgentChange?.(true);
+    } else {
+      setDeep(true);
+      onDeepChange?.(true);
+    }
     inputRef.current?.focus();
-    onDeepChange?.(true);
   };
 
   const canSearch = query.trim().length > 0 && !isLoading;

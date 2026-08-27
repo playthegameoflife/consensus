@@ -33,6 +33,14 @@ interface SynthesisResult {
   error?: string;
 }
 
+interface AgentResult {
+  plan: { query: string; rationale: string }[];
+  searches: { query: string; total: number; papers: Paper[] }[];
+  papers: (Paper & { aiFinding?: string })[];
+  answer: string;
+  steps: { action: string; status: string; detail?: string }[];
+}
+
 export default function Home() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult | null>(null);
@@ -61,6 +69,10 @@ export default function Home() {
   const [searchCount, setSearchCount] = useState(1);
   const [followUps, setFollowUps] = useState<FollowUpMessage[]>([]);
   const [followUpLoading, setFollowUpLoading] = useState(false);
+
+  // Research Agent state (🤖 Research Agent mode)
+  const [agentResult, setAgentResult] = useState<AgentResult | null>(null);
+  const [agentLoading, setAgentLoading] = useState(false);
 
   // Multi-select for "ask these papers"
   const [selectedPapers, setSelectedPapers] = useState<Map<string, { title: string; author: string; year: number }>>(new Map());
@@ -113,6 +125,24 @@ export default function Home() {
     }
   }, []);
 
+  /** Fetch the Research Agent result for a query. */
+  const fetchAgent = useCallback(async (q: string) => {
+    setAgentLoading(true);
+    setAgentResult(null);
+    try {
+      const res = await fetch(
+        `/api/research-agent?q=${encodeURIComponent(q)}`
+      );
+      if (!res.ok) throw new Error("agent failed");
+      const data: AgentResult = await res.json();
+      setAgentResult(data);
+    } catch {
+      setAgentResult(null);
+    } finally {
+      setAgentLoading(false);
+    }
+  }, []);
+
   const doSearch = useCallback(
     async (q: string, offset = 0) => {
       if (!q.trim()) return;
@@ -132,8 +162,12 @@ export default function Home() {
           localStorage.setItem("consensus_search_history", JSON.stringify(next));
         } catch {}
         addToHistory(q);
-        // Kick off Pro synthesis in parallel (non-blocking)
-        fetchSynthesis(q, searchMode);
+        // Kick off Pro synthesis or Research Agent in parallel (non-blocking)
+        if (searchMode === "agent") {
+          fetchAgent(q);
+        } else {
+          fetchSynthesis(q, searchMode);
+        }
       } else {
         setIsLoadingMore(true);
       }
@@ -190,7 +224,7 @@ export default function Home() {
         setIsLoadingMore(false);
       }
     },
-    [filters, corpus, searchMode, searchHistory, fetchSynthesis]
+    [filters, corpus, searchMode, searchHistory, fetchSynthesis, fetchAgent]
   );
 
   const handleCorpusChange = useCallback(
@@ -209,11 +243,15 @@ export default function Home() {
       if (query && !results) {
         doSearch(query, 0);
       } else if (query) {
-        // Re-fetch synthesis when mode changes mid-thread
-        fetchSynthesis(query, newMode);
+        // Re-fetch synthesis/agent when mode changes mid-thread
+        if (newMode === "agent") {
+          fetchAgent(query);
+        } else {
+          fetchSynthesis(query, newMode);
+        }
       }
     },
-    [query, results, doSearch, fetchSynthesis]
+    [query, results, doSearch, fetchSynthesis, fetchAgent]
   );
 
   // Refetch on filter changes only when there's already a query
@@ -224,8 +262,11 @@ export default function Home() {
 
   /** Build meter verdicts from current papers (retracted papers excluded — consensus.app never uses them in analyses) */
   const verdicts: MeterVerdict[] = useMemo(() => {
-    if (!results) return [];
-    return results.papers
+    const sourcePapers = searchMode === "agent" && agentResult
+      ? agentResult.papers
+      : results?.papers;
+    if (!sourcePapers) return [];
+    return sourcePapers
       .filter((p) => !p.isRetracted)
       .slice(0, 20)
       .map((p) => ({
@@ -236,7 +277,7 @@ export default function Home() {
         verdict: classifyVerdict(p.aiFinding),
         keyFinding: p.aiFinding,
       }));
-  }, [results]);
+  }, [results, agentResult, searchMode]);
 
   /** Ask a follow-up question within this thread (Threads). */
   const handleAskFollowUp = useCallback(
@@ -388,6 +429,9 @@ export default function Home() {
                 onDeepChange={(d) =>
                   handleModeChange(d ? "deep" : "basic")
                 }
+                onAgentChange={(a) =>
+                  handleModeChange(a ? "agent" : "basic")
+                }
               />
 
               <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-slate-500">
@@ -447,6 +491,8 @@ export default function Home() {
                   query={query}
                   mode={searchMode}
                   searchCount={searchCount}
+                  agentResult={agentResult}
+                  agentLoading={agentLoading}
                   synthesis={
                     synthesis ||
                     `Found ${results?.total.toLocaleString() || "matching"} papers for your question. ${
@@ -458,7 +504,7 @@ export default function Home() {
                   synthesisLoading={synthesisLoading || isLoading}
                   verdicts={verdicts}
                   meterLoading={isLoading}
-                  papers={results?.papers || []}
+                  papers={searchMode === "agent" && agentResult ? agentResult.papers : (results?.papers || [])}
                   isLoadingPapers={isLoading}
                   onAskFollowUp={handleAskFollowUp}
                   followUps={followUps}

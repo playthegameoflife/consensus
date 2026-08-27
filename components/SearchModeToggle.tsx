@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Sparkles, BookOpen, Zap } from "lucide-react";
 
-export type SearchMode = "basic" | "pro" | "deep";
+export type SearchMode = "basic" | "pro" | "deep" | "agent";
 
 interface SearchModeToggleProps {
   onModeChange: (mode: SearchMode) => void;
