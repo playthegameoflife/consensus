@@ -355,10 +355,10 @@ export function EnhancedPaperDetailPanel({
                   <div className="flex items-center justify-between pt-2">
                     <span className="text-sm text-slate-500">Export citation</span>
                     <DropdownMenu>
-                      <DropdownMenuTrigger>
-                        <Button variant="outline" size="sm" className="h-8 text-xs gap-1 cursor-pointer">
-                          BibTeX <ChevronDown className="w-3 h-3" />
-                        </Button>
+                      <DropdownMenuTrigger
+                        className="inline-flex shrink-0 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-3 h-8 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 cursor-pointer transition-colors outline-none"
+                      >
+                        BibTeX <ChevronDown className="w-3 h-3" />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="max-w-xs">
                         {(["bibtex", "apa", "mla"] as const).map((fmt) => (

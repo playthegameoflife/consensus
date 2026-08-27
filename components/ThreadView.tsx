@@ -72,6 +72,7 @@ function renderSynthesisWithCitations(
         nodes.push(
           <CitationChip
             key={`cite-${key++}`}
+            number={n}
             paper={citedPaper}
             onOpenDetails={onOpenDetails}
           />

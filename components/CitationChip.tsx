@@ -5,6 +5,7 @@ import { FileText, ExternalLink } from "lucide-react";
 import { Paper } from "@/lib/types";
 
 interface CitationHoverCardProps {
+  number: number;
   paper: Paper;
   onOpenDetails?: (paper: Paper) => void;
 }
@@ -15,6 +16,7 @@ interface CitationHoverCardProps {
  * Details + PDF buttons.
  */
 export function CitationChip({
+  number,
   paper,
   onOpenDetails,
 }: CitationHoverCardProps) {
@@ -28,7 +30,7 @@ export function CitationChip({
       onMouseLeave={() => setHovered(false)}
     >
       <button className="inline-flex items-center justify-center align-super mx-0.5 w-4 h-4 rounded-full bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-bold transition-colors">
-        {""}
+        {number}
       </button>
 
       {hovered && (
