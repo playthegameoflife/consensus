@@ -244,25 +244,30 @@ export function ThreadView({
                 </div>
               </div>
 
-              {/* Synthesis — gated when devGate is on (preview of consensus.app paywall) */}
-              {devGate && (mode === "pro" || mode === "deep") ? (
-                <GateOverlay feature={mode === "deep" ? "deep" : "pro"} />
-              ) : synthesisLoading ? (
-                <div className="animate-pulse space-y-2 mb-5">
-                  <div className="h-3 bg-slate-100 rounded w-full" />
-                  <div className="h-3 bg-slate-100 rounded w-11/12" />
-                  <div className="h-3 bg-slate-100 rounded w-9/12" />
-                  <p className="text-sm text-slate-500 pt-1 text-shimmer">
-                    {MODE_LABEL[mode]} · {LOADING_STAGES[stageIdx]}
-                  </p>
-                </div>
-              ) : (
-                <div className="text-[15px] text-slate-700 mb-5">
-                  {renderSynthesisWithCitations(synthesis, papers, onSelectPaper)}
-                </div>
+              {/* Synthesis — only shown for Pro/Deep/Agent modes
+                  Quick/Basic mode shows papers only, matching live consensus.app */}
+              {mode !== "basic" && (
+                <>
+                  {devGate && (mode === "pro" || mode === "deep") ? (
+                    <GateOverlay feature={mode === "deep" ? "deep" : "pro"} />
+                  ) : synthesisLoading ? (
+                    <div className="animate-pulse space-y-2 mb-5">
+                      <div className="h-3 bg-slate-100 rounded w-full" />
+                      <div className="h-3 bg-slate-100 rounded w-11/12" />
+                      <div className="h-3 bg-slate-100 rounded w-9/12" />
+                      <p className="text-sm text-slate-500 pt-1 text-shimmer">
+                        {MODE_LABEL[mode]} · {LOADING_STAGES[stageIdx]}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-[15px] text-slate-700 whitespace-pre-line line-clamp-3 mb-5">
+                      {renderSynthesisWithCitations(synthesis, papers, onSelectPaper)}
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Research Agent block — plan → searches → cited report */}
+              {/* Research Agent block: plan, searches, cited report */}
               {mode === "agent" && (
                 <div className="mb-5">
                   {devGate ? (

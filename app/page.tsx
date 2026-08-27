@@ -609,7 +609,7 @@ export default function Home() {
                     `Found ${results?.total.toLocaleString() || "matching"} papers for your question. ${
                       searchMode !== "basic"
                         ? "AI synthesis loading…"
-                        : "Turn on Pro for a synthesized answer."
+                        : "Turn on Deep for an AI-synthesized answer."
                     }`
                   }
                   synthesisLoading={synthesisLoading || isLoading}
