@@ -139,12 +139,24 @@ export function ThreadView({
   const [copied, setCopied] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // consensus.app's animated loading stages — verified live:
-  // "Pro · Scoping...", "Researching...", "Elucidating...", "Eureka-ing..."
+  // consensus.app's animated loading stages — verified LIVE via Scrapling
+  // (13 unique stages observed across repeated requests):
+  // Scoping, Researching, Scholaring, Bibliomining, Catalyzing, Mapping,
+  // Hypothesizing, Theorizing, Discovering, Distilling, Elucidating,
+  // Science-ing, Eureka-ing
   const LOADING_STAGES = [
     "Scoping...",
     "Researching...",
+    "Scholaring...",
+    "Bibliomining...",
+    "Catalyzing...",
+    "Mapping...",
+    "Hypothesizing...",
+    "Theorizing...",
+    "Discovering...",
+    "Distilling...",
     "Elucidating...",
+    "Science-ing...",
     "Eureka-ing...",
   ];
   const [stageIdx, setStageIdx] = useState(0);
@@ -153,7 +165,7 @@ export function ThreadView({
     setStageIdx(0);
     const id = setInterval(() => {
       setStageIdx((i) => (i + 1) % LOADING_STAGES.length);
-    }, 2200);
+    }, 2000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [synthesisLoading]);
