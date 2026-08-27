@@ -205,14 +205,32 @@ export function CitationGraph({ paper, onNodeClick }: CitationGraphProps) {
           })),
         ];
 
+        // A paper can appear in BOTH citing and references lists — dedupe by id
+        // so React keys stay unique (duplicate keys caused console warnings).
+        const seenNodeIds = new Set<string>();
+        const uniqueNodes = graphNodes.filter((n) => {
+          if (seenNodeIds.has(n.id)) return false;
+          seenNodeIds.add(n.id);
+          return true;
+        });
+
         const graphLinks: GraphLink[] = [
           ...citing.map((c) => ({ source: c.paperId, target: paper.paperId })),
           ...refs.map((r) => ({ source: paper.paperId, target: r.paperId })),
         ];
+        // Dedupe links (same pair can appear twice if a paper is both citing
+        // and referenced)
+        const seenLinkKeys = new Set<string>();
+        const uniqueLinks = graphLinks.filter((l) => {
+          const k = `${l.source}|${l.target}`;
+          if (seenLinkKeys.has(k)) return false;
+          seenLinkKeys.add(k);
+          return true;
+        });
 
-        const laidOut = simulateLayout(graphNodes, graphLinks, centerX, centerY, dimensions.width, dimensions.height);
+        const laidOut = simulateLayout(uniqueNodes, uniqueLinks, centerX, centerY, dimensions.width, dimensions.height);
         setNodes(laidOut);
-        setLinks(graphLinks);
+        setLinks(uniqueLinks);
       })
       .catch(() => {
         setNodes([]);
