@@ -17,7 +17,7 @@ function hasLLM() {
   return !!LLM_KEY;
 }
 
-async function callLLM(
+export async function callLLM(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,

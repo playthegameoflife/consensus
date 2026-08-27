@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { extractAIFinding } from '@/lib/llm'
+import { callLLM } from '@/lib/llm'
 
-export const runtime = 'edge'
+export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,9 +35,13 @@ Please answer the question based on the paper abstract and the conversation hist
 
 Answer:`
 
-    const answer = await extractAIFinding(paperAbstract || '', `Q: ${question}\nContext: ${paperAbstract || 'N/A'}`)
+    const answer = await callLLM(
+      'You are a helpful research assistant discussing a scholarly paper. Answer questions directly and specifically based only on the paper abstract provided.',
+      prompt,
+      500
+    )
 
-    return NextResponse.json({ answer })
+    return NextResponse.json({ answer: answer || 'No answer generated — add OPENROUTER_API_KEY to .env.local for AI answers.' })
   } catch (err) {
     console.error('Chat API error:', err)
     return NextResponse.json({ error: 'Failed to generate response' }, { status: 500 })
