@@ -18,7 +18,7 @@ import {
   classifyVerdict,
 } from "@/components/ConsensusMeter4Way";
 import { Paper } from "@/lib/types";
-import { HelpCircle, Search, RefreshCw } from "lucide-react";
+import { HelpCircle, Search, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 interface SearchResult {
   papers: (Paper & { aiFinding?: string; consensusScore?: number })[];
@@ -55,6 +55,7 @@ export default function Home() {
   });
   const [corpus, setCorpus] = useState<CorpusType>("all");
   const [searchMode, setSearchMode] = useState<SearchModeType>("basic");
+  const [filterOpen, setFilterOpen] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<
     (Paper & { aiFinding?: string }) | null
   >(null);
@@ -483,9 +484,42 @@ export default function Home() {
                     Save search
                   </button>
                 )}
+                <button
+                  onClick={() => setFilterOpen((v) => !v)}
+                  className={`pointer-events-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full transition-colors ${
+                    filterOpen
+                      ? "bg-cyan-100 text-cyan-600"
+                      : "bg-slate-100 text-slate-500 hover:bg-cyan-50 hover:text-cyan-600"
+                  }`}
+                >
+                  <SlidersHorizontal className="w-3 h-3" />
+                  Filter
+                  {filters.studyTypes.length > 0 ||
+                  filters.openAccessOnly ||
+                  filters.citationMin > 0 ||
+                  filters.yearRange[0] !== 1900 ||
+                  filters.yearRange[1] !== 2026 ? (
+                    <span className="ml-0.5 w-4 h-4 rounded-full bg-cyan-500 text-white text-[9px] font-bold flex items-center justify-center">
+                      {(filters.studyTypes.length > 0 ? 1 : 0) +
+                        (filters.openAccessOnly ? 1 : 0) +
+                        (filters.citationMin > 0 ? 1 : 0) +
+                        (filters.yearRange[0] !== 1900 || filters.yearRange[1] !== 2026 ? 1 : 0)}
+                    </span>
+                  ) : null}
+                </button>
               </div>
 
               <div className="flex-1 flex min-h-0">
+                {/* Filter sidebar (toggle from Filter button) */}
+                {filterOpen && (
+                  <div className="w-72 flex-shrink-0 border-r border-slate-100 overflow-y-auto p-4">
+                    <FilterSidebar
+                      onFilterChange={setFilters}
+                      totalResults={results?.total}
+                      defaultStudyTypes={filters.studyTypes}
+                    />
+                  </div>
+                )}
                 {/* Thread view */}
                 <ThreadView
                   query={query}

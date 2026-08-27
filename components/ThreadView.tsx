@@ -279,8 +279,9 @@ export function ThreadView({
                 </div>
               )}
 
-              {/* 4-way Consensus Meter */}
-              {(mode === "pro" || mode === "deep" || mode === "agent") && (
+              {/* 4-way Consensus Meter — only for Pro/Deep where per-paper
+                  AI findings exist (agent mode has the Research Report instead) */}
+              {(mode === "pro" || mode === "deep") && (
                 <ConsensusMeter4Way
                   verdicts={verdicts}
                   query={query}
