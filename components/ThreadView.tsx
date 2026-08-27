@@ -139,6 +139,25 @@ export function ThreadView({
   const [copied, setCopied] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // consensus.app's animated loading stages — verified live:
+  // "Pro · Scoping...", "Researching...", "Elucidating...", "Eureka-ing..."
+  const LOADING_STAGES = [
+    "Scoping...",
+    "Researching...",
+    "Elucidating...",
+    "Eureka-ing...",
+  ];
+  const [stageIdx, setStageIdx] = useState(0);
+  useEffect(() => {
+    if (!synthesisLoading) return;
+    setStageIdx(0);
+    const id = setInterval(() => {
+      setStageIdx((i) => (i + 1) % LOADING_STAGES.length);
+    }, 2200);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [synthesisLoading]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [followUps.length, followUpLoading]);
@@ -217,8 +236,7 @@ export function ThreadView({
                   <div className="h-3 bg-slate-100 rounded w-11/12" />
                   <div className="h-3 bg-slate-100 rounded w-9/12" />
                   <p className="text-xs text-slate-400 pt-1">
-                    Analyzing top papers (this can take a minute with Deep
-                    models)...
+                    {MODE_LABEL[mode]} · {LOADING_STAGES[stageIdx]}
                   </p>
                 </div>
               ) : (
@@ -236,8 +254,7 @@ export function ThreadView({
                       <div className="h-3 bg-slate-100 rounded w-2/3" />
                       <div className="h-3 bg-slate-100 rounded w-3/4" />
                       <p className="text-xs text-slate-400 pt-1">
-                        🤖 Planning sub-queries, searching literature, and
-                        synthesizing a report (can take a minute or two)...
+                        🤖 Research Agent · {LOADING_STAGES[stageIdx]}
                       </p>
                     </div>
                   ) : agentResult ? (
