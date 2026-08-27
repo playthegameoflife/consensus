@@ -27,7 +27,12 @@ import {
   addPaperToCollection,
   removePaperFromCollection,
 } from "@/lib/collections";
-import { isDevGateEnabled, initDevGateFromUrl } from "@/lib/gate";
+import {
+  isDevGateEnabled,
+  initDevGateFromUrl,
+  setDevGate as persistDevGate,
+} from "@/lib/gate";
+import { DevGateToggle } from "@/components/DevGateToggle";
 import { HelpCircle, Search, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 interface SearchResult {
@@ -453,14 +458,21 @@ export default function Home() {
 
       {/* Main area */}
       <div className="flex-1 min-w-0 flex flex-col relative">
-        {/* Top right sign-up pill */}
-        {!query && (
-          <div className="absolute top-4 right-4 z-30">
+        {/* Top right — dev gate toggle + sign-up pill */}
+        <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+          <DevGateToggle
+            enabled={devGate}
+            onChange={(v) => {
+              persistDevGate(v);
+              setDevGate(v);
+            }}
+          />
+          {!query && (
             <button className="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium rounded-full transition-colors shadow-sm">
               Sign up
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         <main className="flex-1 flex flex-col min-h-0">
           {!query ? (
