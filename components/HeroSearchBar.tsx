@@ -169,6 +169,7 @@ export function HeroSearchBar({
             maxLength={10000}
             disabled={isLoading}
             rows={1}
+            data-testid="new-thread-input"
             className="block w-full max-h-[200px] resize-none outline-none bg-transparent text-[15px] text-slate-800 placeholder:text-slate-400 py-1"
             style={{ overflowY: "auto" }}
           />

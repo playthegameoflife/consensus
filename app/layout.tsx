@@ -17,6 +17,16 @@ export const metadata: Metadata = {
   title: "Consensus: AI for Research",
   description:
     "Consensus is an AI academic search engine for peer-reviewed literature—your research OS for finding, organizing, and analyzing science 10x faster.",
+  icons: {
+    icon: ["/favicon.ico", "/favicon.png", "/favicon.svg"],
+  },
+};
+
+// Matches live consensus.app: width=device-width, initial-scale=1.0, minimum-scale=1.0
+export const viewport = {
+  width: "device-width",
+  initialScale: 1.0,
+  minimumScale: 1.0,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

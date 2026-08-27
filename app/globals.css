@@ -128,3 +128,17 @@
     @apply font-sans;
   }
 }
+/* consensus.app's text shimmer loading effect (verified live) */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.text-shimmer {
+  background: linear-gradient(90deg, var(--color-slate-400, #94a3b8) 35%, var(--color-slate-700, #334155) 50%, var(--color-slate-400, #94a3b8) 65%);
+  background-size: 200% 100%;
+  animation: shimmer 2.8s infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}

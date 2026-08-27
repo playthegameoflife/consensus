@@ -247,7 +247,7 @@ export function ThreadView({
                   <div className="h-3 bg-slate-100 rounded w-full" />
                   <div className="h-3 bg-slate-100 rounded w-11/12" />
                   <div className="h-3 bg-slate-100 rounded w-9/12" />
-                  <p className="text-xs text-slate-400 pt-1">
+                  <p className="text-sm text-slate-500 pt-1 text-shimmer">
                     {MODE_LABEL[mode]} · {LOADING_STAGES[stageIdx]}
                   </p>
                 </div>

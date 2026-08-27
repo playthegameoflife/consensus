@@ -464,7 +464,10 @@ export default function Home() {
                   Consensus
                 </span>
               </div>
-              <h1 className="text-3xl font-bold text-slate-900 mb-10 text-center">
+              <h1
+                data-testid="subtitle"
+                className="text-3xl font-bold text-slate-900 mb-10 text-center"
+              >
                 Research starts here
               </h1>
 
@@ -506,7 +509,10 @@ export default function Home() {
             // Results page — ChatGPT-style thread layout
             <>
               {/* Compact top bar with new-thread + filter sidebar toggle */}
-              <div className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-white via-white/90 to-transparent h-14 pointer-events-none flex items-center justify-between px-6 lg:px-10">
+              <div
+                data-testid="topbar"
+                className="absolute top-0 left-0 right-0 z-20 bg-gradient-to-b from-white via-white/90 to-transparent h-14 pointer-events-none flex items-center justify-between px-6 lg:px-10"
+              >
                 <button
                   onClick={() => {
                     setQuery("");
