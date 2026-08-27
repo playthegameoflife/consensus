@@ -39,6 +39,7 @@ export default function ChatWithPaper({ paper, onClose }: ChatWithPaperProps) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(true)
+  const [usedFullText, setUsedFullText] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -69,9 +70,13 @@ export default function ChatWithPaper({ paper, onClose }: ChatWithPaperProps) {
           paperAbstract: paper.abstract || '',
           question: text.trim(),
           chatHistory: messages.filter(m => m.role === 'assistant'),
+          paper, // full Paper object → enables full-text reading
         }),
       })
       const data = await res.json()
+      if (typeof data.usedFullText === 'boolean') {
+        setUsedFullText(data.usedFullText)
+      }
       const assistantMsg: ChatMessage = {
         id: `msg_${Date.now()}_a`,
         role: 'assistant',
@@ -109,6 +114,15 @@ export default function ChatWithPaper({ paper, onClose }: ChatWithPaperProps) {
       <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
         <MessageCircle className="w-4 h-4 text-blue-500" />
         <span className="text-sm font-semibold text-slate-700">Ask this paper</span>
+        {usedFullText ? (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-100 text-[9px] font-bold tracking-wide">
+            USED FULL TEXT
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 border border-slate-200 text-[9px] font-bold tracking-wide">
+            USED ABSTRACT
+          </span>
+        )}
         <span className="text-xs text-slate-400 truncate flex-1 ml-1">{paper.title}</span>
         <button onClick={onClose} className="p-1 rounded hover:bg-slate-200 text-slate-400 transition-colors">
           <X className="w-4 h-4" />

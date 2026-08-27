@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchPapers } from "@/lib/openalex";
 import { extractAIFinding } from "@/lib/llm";
 import { Paper } from "@/lib/types";
+import { getPaperFullText } from "@/lib/fulltext";
 
-export const runtime = "edge";
+// NOTE: consumed by app/api/pro-search/route.ts which runs on nodejs runtime
+// (full-text PDF extraction needs Node APIs).
 
 interface Step {
   action: "search" | "extract" | "synthesize" | "finalize";
@@ -118,6 +120,25 @@ async function synthesizeAnswer(
     })
     .join("\n\n");
 
+  // Enrich with full text for the top papers (consensus.app reads full papers
+  // when available, not just abstracts). Limit to top 5 for token budget.
+  let fullTextBlock = "";
+  const topForFullText = papers.slice(0, 5);
+  const fullTexts = await Promise.allSettled(
+    topForFullText.map((p) => getPaperFullText(p))
+  );
+  const ftParts: string[] = [];
+  fullTexts.forEach((r, idx) => {
+    if (r.status === "fulfilled" && r.value.usedFullText) {
+      ftParts.push(
+        `[${idx + 1}] FULL TEXT (${r.value.source || "pdf"}):\n${r.value.text.slice(0, 6000)}`
+      );
+    }
+  });
+  if (ftParts.length > 0) {
+    fullTextBlock = `\n\nADDITIONAL FULL-TEXT CONTENT (use for depth on methods/results when relevant):\n${ftParts.join("\n\n")}`;
+  }
+
   const prompt = `You are a research assistant. Based on the following numbered papers and their findings, synthesize a comprehensive answer to the query: "${query}"
 
 CRITICAL CITATION RULES:
@@ -133,6 +154,7 @@ Focus on:
 
 Papers:
 ${paperSummaries}
+${fullTextBlock}
 
 Respond with a well-structured answer (3-5 paragraphs, plain text with [N] citations, no markdown headers) grounded ONLY in the papers above. Do not invent findings.`;
 

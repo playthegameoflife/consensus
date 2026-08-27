@@ -1,9 +1,14 @@
 /**
- * PDF Text Extraction using pdf-parse
+ * PDF Text Extraction using pdf-parse v1 (classic function API)
  * Extracts text from PDF Buffer and chunks into ~2000 token segments
  */
 
-interface ExtractResult {
+// Import the inner parse module directly (bypasses index.js's debug-mode
+// wrapper that reads ./test/data when bundled by Turbopack).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import pdfParse from "pdf-parse/lib/pdf-parse.js";
+
+export interface ExtractResult {
   text: string;
   chunks: string[];
   success: boolean;
@@ -15,21 +20,16 @@ const CHUNK_SIZE_TOKENS = 2000;
 const CHUNK_OVERLAP_TOKENS = 200;
 const CHARS_PER_TOKEN = 4;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function getPdfParse(): Promise<any> {
-  const mod: any = await import("pdf-parse");
-  return mod.default || mod;
-}
-
 /**
- * Extract text from PDF Buffer and split into chunks
+ * Extract text from PDF Buffer and split into chunks.
+ * Uses pdf-parse v1's classic API: pdfParse(buffer) → { text }
  */
 export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<ExtractResult> {
   try {
-    const pdfParse = await getPdfParse();
     const data = await pdfParse(pdfBuffer);
 
-    if (!data.text || data.text.trim().length === 0) {
+    const rawText = (data?.text || "").trim();
+    if (!rawText || rawText.length === 0) {
       return {
         text: "",
         chunks: [],
@@ -39,7 +39,7 @@ export async function extractTextFromPDF(pdfBuffer: Buffer): Promise<ExtractResu
     }
 
     // Clean up text: normalize whitespace
-    const text = data.text
+    const text = rawText
       .replace(/\f/g, "\n")
       .replace(/\s+/g, " ")
       .trim();
