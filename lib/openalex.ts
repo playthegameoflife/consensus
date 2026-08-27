@@ -24,6 +24,7 @@ const WORK_FIELDS = [
   "language",
   "ids",
   "concepts",
+  "is_retracted",
 ].join(",");
 
 interface RawAuthor {
@@ -60,6 +61,7 @@ interface RawWork {
     openalex?: string;
   };
   concepts?: Array<{ display_name?: string; score?: number }>;
+  is_retracted?: boolean;
 }
 
 interface RawSearchResponse {
@@ -169,6 +171,7 @@ function mapWork(work: RawWork): import("./types").Paper {
     openAccessStatus: work.open_access?.oa_status,
     fieldsOfStudy,
     language: work.language || undefined,
+    isRetracted: work.is_retracted || false,
   };
 }
 

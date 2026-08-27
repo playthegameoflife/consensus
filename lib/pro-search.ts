@@ -47,11 +47,11 @@ export async function runProSearch(query: string, depth: "pro" | "deep" = "pro")
     query,
   };
 
-  // Step 1: Search
+  // Step 1: Search — exclude retracted papers (consensus.app never uses them in analyses)
   state.steps[0].status = "running";
   try {
     const result = await searchPapers(query, 0, paperLimit);
-    state.papers = result.papers;
+    state.papers = result.papers.filter((p) => !p.isRetracted);
     state.steps[0] = { action: "search", status: "done", result: { total: result.total } };
   } catch (err) {
     state.steps[0] = {

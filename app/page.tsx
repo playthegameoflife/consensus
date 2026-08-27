@@ -222,17 +222,20 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, corpus]);
 
-  /** Build meter verdicts from current papers */
+  /** Build meter verdicts from current papers (retracted papers excluded — consensus.app never uses them in analyses) */
   const verdicts: MeterVerdict[] = useMemo(() => {
     if (!results) return [];
-    return results.papers.slice(0, 20).map((p) => ({
-      paperId: p.paperId,
-      title: p.title,
-      year: p.year,
-      journal: p.journal,
-      verdict: classifyVerdict(p.aiFinding),
-      keyFinding: p.aiFinding,
-    }));
+    return results.papers
+      .filter((p) => !p.isRetracted)
+      .slice(0, 20)
+      .map((p) => ({
+        paperId: p.paperId,
+        title: p.title,
+        year: p.year,
+        journal: p.journal,
+        verdict: classifyVerdict(p.aiFinding),
+        keyFinding: p.aiFinding,
+      }));
   }, [results]);
 
   /** Ask a follow-up question within this thread (Threads). */

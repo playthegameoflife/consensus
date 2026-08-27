@@ -35,6 +35,9 @@ export interface Paper {
   openAccessStatus?: string;
   // OpenAlex language code (e.g. "en")
   language?: string;
+  // OpenAlex retraction flag — consensus.app shows ⚠️RETRACTED and never uses
+  // retracted papers in analyses/summaries
+  isRetracted?: boolean;
 }
 
 export interface SearchResult {

@@ -55,6 +55,13 @@ export function PaperRow({
           {paper.title}
         </h4>
 
+        {/* RETRACTED badge — consensus.app marks these and excludes from analyses */}
+        {paper.isRetracted && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 text-[10px] font-bold tracking-wide mb-1.5">
+            ⚠️ RETRACTED
+          </span>
+        )}
+
         {/* KEY TAKEAWAY block — left-bordered quote like consensus.app */}
         <p className="text-[13px] text-slate-600 leading-relaxed border-l-2 border-emerald-400 pl-2.5 mb-2 line-clamp-2">
           {takeaway}

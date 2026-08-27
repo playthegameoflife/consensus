@@ -42,12 +42,12 @@ export async function POST(req: NextRequest) {
     // consensus.app behavior: follow-ups that introduce new topics trigger a
     // sub-search, and its results join the thread ("2 queries", "3 queries").
     // Heuristic: always fetch fresh papers for the follow-up; the synthesis
-    // uses existing thread papers + new ones.
+    // uses existing thread papers + new ones. Retracted papers excluded.
     let newPapers: Paper[] = [];
     let subSearchTotal = 0;
     try {
       const result = await searchPapers(query, 0, 10);
-      newPapers = result.papers;
+      newPapers = result.papers.filter((p) => !p.isRetracted);
       subSearchTotal = result.total;
     } catch {
       // non-fatal: proceed with thread papers only

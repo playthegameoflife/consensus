@@ -213,6 +213,11 @@ export function EnhancedPaperDetailPanel({
 
           {/* Title & Authors */}
           <div className="px-6 pt-4 pb-2">
+            {paper.isRetracted && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold tracking-wide mb-2">
+                ⚠️ RETRACTED
+              </span>
+            )}
             <h2 className="font-serif text-xl font-bold text-slate-900 leading-snug mb-1">
               {paper.title}
             </h2>
