@@ -55,6 +55,7 @@ export interface SearchFilters {
   citationCountMin?: number;
   openAccessOnly?: boolean;
   corpus?: "all" | "medical";
+  source?: "pubmed" | "arxiv" | "biorxiv" | "medrxiv";
   sort?: SortOrder;
 }
 

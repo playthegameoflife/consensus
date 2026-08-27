@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  Plus,
   ChevronDown,
   Sparkles,
   SlidersHorizontal,
@@ -18,6 +17,8 @@ interface HeroSearchBarProps {
   deep?: boolean;
   onDeepChange?: (deep: boolean) => void;
   onAgentChange?: (agent: boolean) => void;
+  source?: string;
+  onSourceChange?: (source: string) => void;
 }
 
 export type QuickAction =
@@ -27,6 +28,15 @@ export type QuickAction =
   | { type: "research-agent" };
 
 const CORPUS_OPTIONS = ["All papers", "Medical"];
+
+// Data sources — consensus.app lets you pick where to search
+const SOURCE_OPTIONS = [
+  { value: "all", label: "All sources" },
+  { value: "pubmed", label: "PubMed" },
+  { value: "arxiv", label: "arXiv" },
+  { value: "biorxiv", label: "bioRxiv" },
+  { value: "medrxiv", label: "medRxiv" },
+];
 
 const QUICK_ACTIONS: {
   icon: string;
@@ -68,12 +78,16 @@ export function HeroSearchBar({
   deep: deepProp = false,
   onDeepChange,
   onAgentChange,
+  source: sourceProp = "all",
+  onSourceChange,
 }: HeroSearchBarProps) {
   const [query, setQuery] = useState("");
   const [corpusOpen, setCorpusOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [corpus, setCorpus] = useState(corpusProp);
   const [deep, setDeep] = useState(deepProp);
   const [agent, setAgent] = useState(false);
+  const [source, setSource] = useState(sourceProp);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Sync local state when the parent changes the prop (e.g. quick action
@@ -84,6 +98,9 @@ export function HeroSearchBar({
   useEffect(() => {
     setCorpus(corpusProp);
   }, [corpusProp]);
+  useEffect(() => {
+    setSource(sourceProp);
+  }, [sourceProp]);
 
   const handleSubmit = () => {
     if (!query.trim() || isLoading) return;
@@ -94,6 +111,12 @@ export function HeroSearchBar({
     setCorpus(c);
     setCorpusOpen(false);
     onCorpusChange?.(c);
+  };
+
+  const handleSource = (s: string) => {
+    setSource(s);
+    setSourcesOpen(false);
+    onSourceChange?.(s);
   };
 
   const handleDeep = () => {
@@ -164,21 +187,43 @@ export function HeroSearchBar({
           )}
         </div>
 
-        {/* Row 2: controls */}
+        {/* Row 2: controls — matches current consensus.app: Sources | Corpus | Deep | Filter | → */}
         <div className="flex justify-between items-center pt-1">
           <div className="flex gap-2 items-center">
-            {/* New thread + button */}
-            <button
-              type="button"
-              title="New thread"
-              onClick={() => {
-                setQuery("");
-                inputRef.current?.focus();
-              }}
-              className="flex-shrink-0 w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-cyan-600 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+            {/* Sources selector (data source dropdown) */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setSourcesOpen((v) => !v)}
+                data-testid="data-source-selector-button"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                title="Data source"
+              >
+                <span className="font-medium">Sources</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${
+                    sourcesOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {sourcesOpen && (
+                <div className="absolute top-full left-0 mt-1 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-50">
+                  {SOURCE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => handleSource(opt.value)}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-slate-50 ${
+                        opt.value === source
+                          ? "text-cyan-600 font-medium"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Corpus selector */}
             <div className="relative">
@@ -214,7 +259,7 @@ export function HeroSearchBar({
               )}
             </div>
 
-            {/* Deep+ switch (dashed border when off, like consensus.app) */}
+            {/* Deep switch (label is "Deep" — matches current consensus.app) */}
             <button
               type="button"
               role="switch"
@@ -235,7 +280,7 @@ export function HeroSearchBar({
               <Sparkles
                 className={`w-3.5 h-3.5 ${deep ? "fill-current" : ""}`}
               />
-              <span>Deep+</span>
+              <span>Deep</span>
               <span
                 className={`relative inline-flex w-8 h-[18px] rounded-full transition-colors flex-shrink-0 ${
                   deep ? "bg-purple-500" : "bg-slate-300"

@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   const openAccess = searchParams.get("openAccess") === "true";
   const mode = searchParams.get("mode") || "fast"; // "fast" or "deep"
   const corpus = searchParams.get("corpus") as "all" | "medical" | null;
+  const source = searchParams.get("source") as string | null;
   const sortParam = searchParams.get("sort") as SortOrder | null;
   const studyTypesParam = searchParams.get("studyTypes"); // comma-separated
   const citationMin = parseInt(searchParams.get("citationMin") || "0", 10);
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
     }
     if (openAccess) filters.openAccessOnly = true;
     if (corpus === "medical") filters.corpus = "medical";
+    if (source && source !== "all") filters.source = source as SearchFilters["source"];
     if (sortParam && ["relevance", "newest", "cited", "consensus"].includes(sortParam)) {
       filters.sort = sortParam as SortOrder;
     }

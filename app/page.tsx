@@ -64,6 +64,7 @@ export default function Home() {
   });
   const [corpus, setCorpus] = useState<CorpusType>("all");
   const [searchMode, setSearchMode] = useState<SearchModeType>("basic");
+  const [searchSource, setSearchSource] = useState("all");
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<
     (Paper & { aiFinding?: string }) | null
@@ -215,6 +216,9 @@ export default function Home() {
         if (corpus === "medical") {
           params.set("corpus", "medical");
         }
+        if (searchSource !== "all") {
+          params.set("source", searchSource);
+        }
 
         const res = await fetch(`/api/search?${params}`);
         if (!res.ok) throw new Error("Search failed");
@@ -238,7 +242,7 @@ export default function Home() {
         setIsLoadingMore(false);
       }
     },
-    [filters, corpus, searchMode, searchHistory, fetchSynthesis, fetchAgent]
+    [filters, corpus, searchMode, searchHistory, fetchSynthesis, fetchAgent, searchSource]
   );
 
   const handleCorpusChange = useCallback(
@@ -478,6 +482,8 @@ export default function Home() {
                 onAgentChange={(a) =>
                   handleModeChange(a ? "agent" : "basic")
                 }
+                source={searchSource}
+                onSourceChange={(s) => setSearchSource(s)}
               />
 
               <p className="absolute bottom-8 left-1/2 -translate-x-1/2 text-sm text-slate-500">

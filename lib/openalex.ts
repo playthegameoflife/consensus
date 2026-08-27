@@ -304,6 +304,18 @@ export async function searchPapers(
     );
   }
 
+  // Data source filter (Sources dropdown — consensus.app lets you scope
+  // searches to PubMed/arXiv/bioRxiv/medRxiv). OpenAlex source IDs:
+  const SOURCE_IDS: Record<string, string> = {
+    pubmed: "S4306525036",
+    arxiv: "S4306400194",
+    biorxiv: "S4306402567",
+    medrxiv: "S3005729997",
+  };
+  if (filters?.source && SOURCE_IDS[filters.source]) {
+    filterParts.push(`primary_location.source.id:${SOURCE_IDS[filters.source]}`);
+  }
+
   if (filterParts.length) {
     params.set("filter", filterParts.join(","));
   }
