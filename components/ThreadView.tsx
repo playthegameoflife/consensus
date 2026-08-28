@@ -310,7 +310,68 @@ export function ThreadView({
                 </div>
               )}
 
-              {/* ConsensusMeter 4-way — between synthesis and results */}
+              {/* Research Agent block — plan, searches, cited report */}
+              {mode === "agent" && (
+                <div className="mb-5">
+                  {devGate ? (
+                    <GateOverlay feature="agent" />
+                  ) : agentLoading && !agentResult ? (
+                    <div className="animate-pulse space-y-2">
+                      <div className="h-3 bg-slate-100 rounded w-1/2" />
+                      <div className="h-3 bg-slate-100 rounded w-2/3" />
+                      <div className="h-3 bg-slate-100 rounded w-3/4" />
+                      <p className="text-xs text-slate-400 pt-1">
+                        🤖 Research Agent · {LOADING_STAGES[stageIdx]}
+                      </p>
+                    </div>
+                  ) : agentResult ? (
+                    <div className="bg-gradient-to-br from-indigo-50/60 to-white border border-indigo-100 rounded-2xl p-4">
+                      {/* Plan */}
+                      <div className="mb-3">
+                        <p className="text-[11px] font-bold tracking-wide text-indigo-500 uppercase mb-2">
+                          Research Plan
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {agentResult.plan.map((item, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-indigo-100 text-xs text-slate-700"
+                            >
+                              <span className="w-4 h-4 rounded-full bg-indigo-500 text-white text-[9px] font-bold flex items-center justify-center">
+                                {i + 1}
+                              </span>
+                              {item.query}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Searches summary */}
+                      <div className="mb-3 text-xs text-slate-500">
+                        {agentResult.searches.map((s, i) => (
+                          <span key={i} className="mr-3">
+                            <span className="text-slate-400">{s.total.toLocaleString()}</span> results for "{s.query}"
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Report */}
+                      <p className="text-[11px] font-bold tracking-wide text-indigo-500 uppercase mb-2">
+                        Research Report
+                      </p>
+                      <div className="text-[14px] text-slate-700 leading-relaxed">
+                        {renderSynthesisWithCitations(
+                          agentResult.answer,
+                          agentResult.papers,
+                          onSelectPaper
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {/* ConsensusMeter 4-way — between synthesis and results, for Pro/Deep only */}
               {(mode === "pro" || mode === "deep") && (
                 devGate ? (
                   <GateOverlay feature={mode === "deep" ? "deep" : "pro"} compact />
