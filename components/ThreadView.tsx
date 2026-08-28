@@ -189,11 +189,18 @@ export function ThreadView({
     bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [followUps.length, followUpLoading]);
 
-  // On mount, ensure the thread area starts at the top (question bubble visible)
+  // On mount, scroll the thread area to top so question bubble is visible
   useEffect(() => {
-    if (!bottomRef.current) return;
-    const el = bottomRef.current.parentElement;
-    if (el) el.scrollTop = 0;
+    // Find the overflow-y-auto container and reset its scroll to 0
+    const scrollContainer = document.querySelector('[class*="overflow-y-auto"]') as HTMLElement | null;
+    if (scrollContainer) {
+      // Use requestAnimationFrame to ensure DOM is fully painted
+      requestAnimationFrame(() => {
+        scrollContainer.scrollTop = 0;
+      });
+    }
+    // Also scroll window to top as fallback
+    window.scrollTo(0, 0);
   }, []);
 
   const submitFollowUp = async () => {
