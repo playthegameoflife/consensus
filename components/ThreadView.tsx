@@ -2,15 +2,12 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-  User,
   Sparkles,
-  ChevronDown,
   Copy,
   Share2,
   Bookmark,
   ArrowUp,
   SlidersHorizontal,
-  X,
 } from "lucide-react";
 import { Paper } from "@/lib/types";
 import { PaperRow } from "./PaperRow";
@@ -191,6 +188,13 @@ export function ThreadView({
     // Fallback: scroll window
     bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [followUps.length, followUpLoading]);
+
+  // On mount, ensure the thread area starts at the top (question bubble visible)
+  useEffect(() => {
+    if (!bottomRef.current) return;
+    const el = bottomRef.current.parentElement;
+    if (el) el.scrollTop = 0;
+  }, []);
 
   const submitFollowUp = async () => {
     if (!followInput.trim() || followUpLoading) return;
