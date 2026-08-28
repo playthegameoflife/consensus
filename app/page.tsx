@@ -474,7 +474,7 @@ export default function Home() {
           )}
         </div>
 
-        <main className="flex-1 flex flex-col min-h-0">
+        <main id="main-content" className="flex-1 flex flex-col min-h-0">
           {!query ? (
             // Landing page (no query yet)
             <div className="flex-1 flex flex-col items-center justify-center px-8 pb-12">
