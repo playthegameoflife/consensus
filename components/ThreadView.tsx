@@ -163,9 +163,11 @@ export function ThreadView({
     "Eureka-ing...",
   ];
   const [stageIdx, setStageIdx] = useState(0);
+  const [synthesisExpanded, setSynthesisExpanded] = useState(false);
   useEffect(() => {
     if (!synthesisLoading) return;
     setStageIdx(0);
+    setSynthesisExpanded(false);
     const id = setInterval(() => {
       setStageIdx((i) => (i + 1) % LOADING_STAGES.length);
     }, 2000);
@@ -173,8 +175,21 @@ export function ThreadView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [synthesisLoading]);
 
+  // Scroll to bottom when new messages arrive or loading state changes
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (!bottomRef.current) return;
+    // Find the nearest ancestor scrollable div (overflow-y-auto)
+    let el: HTMLElement | null = bottomRef.current.parentElement;
+    while (el && el !== document.body) {
+      const style = window.getComputedStyle(el);
+      if (style.overflowY === "auto" || style.overflow === "auto") {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+        return;
+      }
+      el = el.parentElement;
+    }
+    // Fallback: scroll window
+    bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [followUps.length, followUpLoading]);
 
   const submitFollowUp = async () => {
@@ -260,8 +275,17 @@ export function ThreadView({
                       </p>
                     </div>
                   ) : (
-                    <div className="text-[15px] text-slate-700 whitespace-pre-line line-clamp-3 mb-5">
-                      {renderSynthesisWithCitations(synthesis, papers, onSelectPaper)}
+                    <div className="mb-5">
+                      <div className={`text-[15px] text-slate-700 whitespace-pre-line ${synthesisExpanded ? "" : "line-clamp-3"}`}>
+                        {renderSynthesisWithCitations(synthesis, papers, onSelectPaper)}
+                      </div>
+                      {/* Show more/less — matches live consensus.app rounded bubble button */}
+                      <button
+                        onClick={() => setSynthesisExpanded((e) => !e)}
+                        className="mt-2 px-4 py-2.5 rounded-tl-[22px] rounded-tr-[22px] rounded-bl-[22px] rounded-br-[8px] cursor-pointer bg-slate-100 hover:bg-slate-200 text-sm text-slate-600 transition-colors"
+                      >
+                        {synthesisExpanded ? "Show less" : "Show more"}
+                      </button>
                     </div>
                   )}
                 </>

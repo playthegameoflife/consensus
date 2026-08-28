@@ -328,15 +328,21 @@ export default function Home() {
           content: m.content,
         }));
 
+        // 30-second timeout so "Thinking…" doesn't hang forever
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30_000);
+
         const res = await fetch("/api/follow-up", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             query: question,
             threadHistory: history,
             papers: contextPapers,
           }),
         });
+        clearTimeout(timeout);
         const data = await res.json();
         const answer =
           data.answer ||
@@ -369,12 +375,15 @@ export default function Home() {
             papers: data.newPapers || [],
           },
         ]);
-      } catch {
+      } catch (err) {
+        const isAbort = err instanceof DOMException && err.name === "AbortError";
         setFollowUps((prev) => [
           ...prev,
           {
             role: "assistant",
-            content: "Something went wrong. Please try again.",
+            content: isAbort
+              ? "This is taking longer than expected — the AI is reasoning through the papers. Try asking again or rephrasing your question."
+              : "Something went wrong. Please try again.",
           },
         ]);
       } finally {
