@@ -243,29 +243,8 @@ export function ThreadView({
               This replaces the old user/assistant chat bubble layout. */}
           {synthesisExpanded && (
             <div className="mb-8">
-              {/* Synthesis text */}
-              {mode === "basic" ? (
-                /* Upsell: prompt upgrade to Pro for AI-synthesized answer */
-                <div className="flex items-start gap-2.5 mb-6">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Sparkles className="w-4 h-4 text-slate-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm text-slate-500 italic leading-relaxed">
-                      Turn on{" "}
-                      <span className="font-semibold text-slate-700 not-italic">
-                        Pro
-                      </span>{" "}
-                      or{" "}
-                      <span className="font-semibold text-slate-700 not-italic">
-                        Deep
-                      </span>{" "}
-                      for an AI-synthesized answer to this question.
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-start gap-2.5 mb-6">
+              {/* Synthesis text — shown in all modes */}
+              <div className="flex items-start gap-2.5 mb-6">
                   <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Sparkles className="w-4 h-4 text-slate-500" />
                   </div>
@@ -299,10 +278,9 @@ export function ThreadView({
                     )}
                   </div>
                 </div>
-              )}
 
               {/* Copy / Bookmark / Share bar */}
-              {mode !== "basic" && !synthesisLoading && synthesis && (
+              {!synthesisLoading && synthesis && (
                 <div className="flex items-center gap-1 mb-4 pl-10">
                   <button
                     onClick={() => {

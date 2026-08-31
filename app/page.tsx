@@ -132,10 +132,6 @@ export default function Home() {
 
   /** Fetch the Pro synthesis for a query in the background. */
   const fetchSynthesis = useCallback(async (q: string, mode: SearchModeType) => {
-    if (mode === "basic") {
-      setSynthesis("");
-      return;
-    }
     setSynthesisLoading(true);
     setSynthesis("");
     try {
