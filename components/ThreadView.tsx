@@ -164,7 +164,6 @@ export function ThreadView({
   useEffect(() => {
     if (!synthesisLoading) return;
     setStageIdx(0);
-    setSynthesisExpanded(false);
     const id = setInterval(() => {
       setStageIdx((i) => (i + 1) % LOADING_STAGES.length);
     }, 2000);
