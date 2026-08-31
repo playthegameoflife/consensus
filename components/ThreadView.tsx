@@ -160,7 +160,7 @@ export function ThreadView({
     "Eureka-ing...",
   ];
   const [stageIdx, setStageIdx] = useState(0);
-  const [synthesisExpanded, setSynthesisExpanded] = useState(false);
+  const [synthesisExpanded, setSynthesisExpanded] = useState(true); // show synthesis by default
   useEffect(() => {
     if (!synthesisLoading) return;
     setStageIdx(0);
