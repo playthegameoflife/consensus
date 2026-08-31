@@ -84,9 +84,8 @@ export async function unifiedSearch(
   limit = 10,
   filters?: import("./types").SearchFilters
 ): Promise<SearchResult> {
-  // Fetch both sources in parallel
   const [oaResult, s2Result] = await Promise.allSettled([
-    searchOpenAlex(query, offset, limit * 3, filters), // Fetch extra OA to account for dupes
+    searchOpenAlex(query, offset, limit * 3, filters),
     searchSemanticScholar(query, offset, limit * 3),
   ]);
 

@@ -2,12 +2,34 @@
  * Semantic Scholar API client.
  * https://api.semanticscholar.org/
  *
- * Free tier: 1000 requests/day, 10 requests/second.
- * No API key required for basic use (with rate limiting).
+ * Free tier: 1000 requests/day, 10 requests/second (with API key).
+ * No API key = very limited (polite pool only — use API key for production).
+ * Free key: https://www.semanticscholar.org/product/api
  */
 
 const BASE_URL = "https://api.semanticscholar.org/graph/v1";
 const API_KEY = process.env.SEMANTIC_SCHOLAR_API_KEY;
+
+/** Retry a fetch up to maxAttempts times on 429/500 errors. */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxAttempts = 3
+): Promise<Response> {
+  let lastError: Error | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const res = await fetch(url, options);
+    if (res.status === 429 || res.status >= 500) {
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = Math.pow(2, attempt - 1) * 1000;
+      await new Promise((r) => setTimeout(r, delay));
+      lastError = new Error(`S2 ${res.status} on attempt ${attempt}`);
+      continue;
+    }
+    return res;
+  }
+  throw lastError || new Error(`S2 fetch failed after ${maxAttempts} attempts`);
+}
 
 // Fields to request per paper (avoid over-fetching)
 const PAPER_FIELDS = [
@@ -84,9 +106,9 @@ export async function searchSemanticScholar(
     headers["x-api-key"] = API_KEY;
   }
 
-  const res = await fetch(`${BASE_URL}/paper/search?${params}`, {
+  const res = await fetchWithRetry(`${BASE_URL}/paper/search?${params}`, {
     headers,
-    next: { revalidate: 0 }, // Don't cache search results
+    next: { revalidate: 0 },
   });
 
   if (!res.ok) {
@@ -111,7 +133,7 @@ export async function getPaperByS2Id(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (API_KEY) headers["x-api-key"] = API_KEY;
 
-  const res = await fetch(
+  const res = await fetchWithRetry(
     `${BASE_URL}/paper/${s2Id}?fields=${PAPER_FIELDS}`,
     { headers }
   );
@@ -131,7 +153,7 @@ export async function getPapersByS2Ids(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (API_KEY) headers["x-api-key"] = API_KEY;
 
-  const res = await fetch(`${BASE_URL}/paper/batch?fields=${PAPER_FIELDS}`, {
+  const res = await fetchWithRetry(`${BASE_URL}/paper/batch?fields=${PAPER_FIELDS}`, {
     method: "POST",
     headers,
     body: JSON.stringify({ ids: s2Ids }),
