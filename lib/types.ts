@@ -23,6 +23,7 @@ export interface Paper {
     PMID?: string;
     PMC?: string;
     MAG?: string;
+    SemanticScholar?: string;
   };
   // "article" | "book-chapter" | "dissertation" | "paratext" | "dataset" | "review" | "letter" | "editorial" | "erratum" | "book" | "lib-genre" | "reference-entry" | "report" | "standard" | "other"
   publicationTypes?: string[];

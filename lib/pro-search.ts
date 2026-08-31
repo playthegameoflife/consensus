@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { searchPapers } from "@/lib/openalex";
+import { unifiedSearch } from "@/lib/unified-search";
 import { extractAIFinding } from "@/lib/llm";
 import { Paper } from "@/lib/types";
 import { getPaperFullText } from "@/lib/fulltext";
@@ -52,7 +53,7 @@ export async function runProSearch(query: string, depth: "pro" | "deep" = "pro")
   // Step 1: Search — exclude retracted papers (consensus.app never uses them in analyses)
   state.steps[0].status = "running";
   try {
-    const result = await searchPapers(query, 0, paperLimit);
+    const result = await unifiedSearch(query, 0, paperLimit);
     state.papers = result.papers.filter((p) => !p.isRetracted);
     state.steps[0] = { action: "search", status: "done", result: { total: result.total } };
   } catch (err) {
