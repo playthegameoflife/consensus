@@ -7,20 +7,20 @@ import {
   Share2,
   Bookmark,
   ArrowUp,
-  SlidersHorizontal,
 } from "lucide-react";
 import { Paper } from "@/lib/types";
 import { PaperRow } from "./PaperRow";
-import { ConsensusMeter4Way, MeterVerdict, classifyVerdict } from "./ConsensusMeter4Way";
+import { ConsensusMeter4Way, MeterVerdict } from "./ConsensusMeter4Way";
 import { CitationChip } from "./CitationChip";
 import { RelatedSearches } from "./RelatedSearches";
 import { ResultsTimeline } from "./ResultsTimeline";
 import { GateOverlay } from "./GateOverlay";
 
+
 export interface FollowUpMessage {
   role: "user" | "assistant";
   content: string;
-  papers?: Paper[]; // new papers added by this follow-up
+  papers?: Paper[];
 }
 
 export interface AgentResult {
@@ -37,7 +37,7 @@ interface ThreadViewProps {
   searchCount: number;
   agentResult?: AgentResult | null;
   agentLoading?: boolean;
-  synthesis: string; // Pro Analysis answer (may be fallback text)
+  synthesis: string;
   synthesisLoading: boolean;
   verdicts: MeterVerdict[];
   meterLoading: boolean;
@@ -55,25 +55,53 @@ interface ThreadViewProps {
   devGate?: boolean;
 }
 
-/**
- * Parse inline [N] citations in the synthesis and render them as
- * hover-card citation chips like consensus.app.
- */
+const MODE_LABEL: Record<string, string> = {
+  basic: "Quick Search",
+  pro: "Pro",
+  deep: "Deep",
+  agent: "Research Agent",
+};
+
+const LOADING_STAGES = [
+  "Scoping...",
+  "Researching...",
+  "Scholaring...",
+  "Bibliomining...",
+  "Catalyzing...",
+  "Mapping...",
+  "Hypothesizing...",
+  "Theorizing...",
+  "Discovering...",
+  "Distilling...",
+  "Elucidating...",
+  "Science-ing...",
+  "Eureka-ing...",
+];
+
 function renderSynthesisWithCitations(
   text: string,
   papers: (Paper & { aiFinding?: string })[],
   onOpenDetails?: (paper: Paper) => void
 ): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
   const regex = /\[(\d{1,2})\]/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
   let key = 0;
 
-  // Split into paragraphs first for proper spacing
   const paragraphs = text.split(/\n\n+/);
+  const parts: React.ReactNode[] = [];
 
   paragraphs.forEach((para, pIdx) => {
+    // Check if this looks like a markdown header
+    if (/^#{1,3}\s/.test(para)) {
+      parts.push(
+        <p key={`h-${pIdx}`} className="mt-4 mb-2 first:mt-0">
+          {para}
+        </p>
+      );
+      return;
+    }
+
     const nodes: React.ReactNode[] = [];
     lastIdx = 0;
     while ((match = regex.exec(para)) !== null) {
@@ -96,7 +124,7 @@ function renderSynthesisWithCitations(
     }
     if (lastIdx < para.length) nodes.push(para.slice(lastIdx));
     parts.push(
-      <p key={`p-${pIdx}`} className="mb-3 last:mb-0 leading-relaxed">
+      <p key={`p-${pIdx}`} className="mb-3 last:mb-0 leading-relaxed text-[15px] text-slate-700">
         {nodes}
       </p>
     );
@@ -104,13 +132,6 @@ function renderSynthesisWithCitations(
 
   return parts;
 }
-
-const MODE_LABEL: Record<string, string> = {
-  basic: "Quick Search",
-  pro: "Pro",
-  deep: "Deep",
-  agent: "Research Agent",
-};
 
 export function ThreadView({
   query,
@@ -137,30 +158,10 @@ export function ThreadView({
 }: ThreadViewProps) {
   const [followInput, setFollowInput] = useState("");
   const [copied, setCopied] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  // consensus.app's animated loading stages — verified LIVE via Scrapling
-  // (13 unique stages observed across repeated requests):
-  // Scoping, Researching, Scholaring, Bibliomining, Catalyzing, Mapping,
-  // Hypothesizing, Theorizing, Discovering, Distilling, Elucidating,
-  // Science-ing, Eureka-ing
-  const LOADING_STAGES = [
-    "Scoping...",
-    "Researching...",
-    "Scholaring...",
-    "Bibliomining...",
-    "Catalyzing...",
-    "Mapping...",
-    "Hypothesizing...",
-    "Theorizing...",
-    "Discovering...",
-    "Distilling...",
-    "Elucidating...",
-    "Science-ing...",
-    "Eureka-ing...",
-  ];
   const [stageIdx, setStageIdx] = useState(0);
-  const [synthesisExpanded, setSynthesisExpanded] = useState(true); // show synthesis by default
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!synthesisLoading) return;
     setStageIdx(0);
@@ -168,13 +169,20 @@ export function ThreadView({
       setStageIdx((i) => (i + 1) % LOADING_STAGES.length);
     }, 2000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [synthesisLoading]);
 
-  // Scroll to bottom when new messages arrive or loading state changes
+  // Scroll to top on mount
+  useEffect(() => {
+    const scrollContainer = document.querySelector('[class*="overflow-y-auto"]') as HTMLElement | null;
+    if (scrollContainer) {
+      requestAnimationFrame(() => { scrollContainer.scrollTop = 0; });
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Scroll to bottom on new messages
   useEffect(() => {
     if (!bottomRef.current) return;
-    // Find the nearest ancestor scrollable div (overflow-y-auto)
     let el: HTMLElement | null = bottomRef.current.parentElement;
     while (el && el !== document.body) {
       const style = window.getComputedStyle(el);
@@ -184,23 +192,8 @@ export function ThreadView({
       }
       el = el.parentElement;
     }
-    // Fallback: scroll window
     bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [followUps.length, followUpLoading]);
-
-  // On mount, scroll the thread area to top so question bubble is visible
-  useEffect(() => {
-    // Find the overflow-y-auto container and reset its scroll to 0
-    const scrollContainer = document.querySelector('[class*="overflow-y-auto"]') as HTMLElement | null;
-    if (scrollContainer) {
-      // Use requestAnimationFrame to ensure DOM is fully painted
-      requestAnimationFrame(() => {
-        scrollContainer.scrollTop = 0;
-      });
-    }
-    // Also scroll window to top as fallback
-    window.scrollTo(0, 0);
-  }, []);
 
   const submitFollowUp = async () => {
     if (!followInput.trim() || followUpLoading) return;
@@ -211,197 +204,234 @@ export function ThreadView({
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
-      {/* Scrollable thread area */}
-      <div className="flex-1 overflow-y-auto px-6 lg:px-10 py-6">
+      {/* ─────────────────────────────────────────────────────────────────────────
+          STICKY HEADER — question button + Share (matches consensus.app)
+      ───────────────────────────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-50 bg-bg-base border-b border-slate-200/60 backdrop-blur-sm">
+        <div className="max-w-3xl mx-auto px-4 md:px-6 h-14 flex items-center gap-3">
+          {/* Question button in sticky header */}
+          <button
+            className="flex-1 overflow-hidden px-3 py-2 rounded-xl transition-colors max-w-96 hover:bg-bg-faint text-left"
+            onClick={() => {
+              // Scroll to top of content
+              contentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            aria-label={`Question: ${query}`}
+          >
+            <span className="text-[15px] font-medium text-fg-base truncate block">
+              {query}
+            </span>
+          </button>
+
+          {/* Share button */}
+          <button
+            className="p-2 rounded-xl hover:bg-bg-faint text-slate-500 transition-colors flex-shrink-0"
+            title="Share"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────────────────
+          SCROLLABLE MAIN CONTENT
+      ───────────────────────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto px-6 lg:px-10 py-6" ref={contentRef}>
         <div className="max-w-3xl mx-auto">
 
-          {/* ──────────────────────────────────────────────────────────────────
-              consensus.app verified structure (Scrapling SSR, Aug 2026):
-              1. Question bubble (right-aligned) is the expand/collapse TOGGLE
-              2. When expanded: synthesis revealed below, inside the same area
-              3. Results come AFTER the synthesis block
-              4. ConsensusMeter appears between synthesis and results
-          ─────────────────────────────────────────────────────────────────── */}
+          {/* H1 question (plain text, not a button) */}
+          <h1 className="text-[22px] font-semibold text-fg-base mb-5 leading-snug">
+            {query}
+          </h1>
 
-          {/* Question bubble — right-aligned, is the expand/collapse toggle */}
-          <div className="flex justify-end mb-6">
-            <div className="relative inline-block">
-              <button
-                onClick={() => setSynthesisExpanded((e) => !e)}
-                aria-expanded={synthesisExpanded}
-                className="px-4 py-2.5 rounded-tl-[22px] rounded-tr-[22px] rounded-bl-[22px] rounded-br-[8px] cursor-pointer bg-slate-100 hover:bg-slate-200 text-left transition-colors"
-              >
-                <p className="text-[15px] text-slate-700 whitespace-pre-line break-words hyphens-auto leading-snug line-clamp-3">
-                  {query}
-                </p>
-              </button>
-            </div>
+          {/* Mode badge + search count + steps */}
+          <div className="flex items-center gap-2 mb-5 flex-wrap">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-indigo-500 text-white text-xs font-semibold">
+              {MODE_LABEL[mode]}
+            </span>
+            <span className="text-xs text-fg-muted">·</span>
+            <span className="text-xs text-fg-muted">
+              {searchCount} {searchCount === 1 ? "search" : "searches"}
+            </span>
+            <span className="text-xs text-fg-muted">·</span>
+            <span className="text-xs text-fg-muted">3 steps</span>
           </div>
 
-          {/* Synthesis + ConsensusMeter block — revealed when question is expanded.
-              This replaces the old user/assistant chat bubble layout. */}
-          {synthesisExpanded && (
-            <div className="mb-8">
-              {/* Synthesis text — shown in all modes */}
-              <div className="flex items-start gap-2.5 mb-6">
-                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Sparkles className="w-4 h-4 text-slate-500" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {/* Thread header */}
-                    <div className="flex items-center gap-2 mb-3 flex-wrap">
-                      <span className="text-sm font-semibold text-slate-800">
-                        {MODE_LABEL[mode]}
-                      </span>
-                      <span className="text-xs text-slate-400">·</span>
-                      <span className="text-xs text-slate-400">
-                        {searchCount} {searchCount === 1 ? "search" : "searches"}
-                      </span>
-                    </div>
+          {/* Query topic pills */}
+          {papers.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {Array.from(new Set(
+                papers
+                  .slice(0, 5)
+                  .map((p) => p.title.split(" ").slice(0, 4).join(" "))
+              )).slice(0, 4).map((tag, i) => (
+                <button
+                  key={i}
+                  onClick={() => onSearch?.(tag)}
+                  className="px-3 py-1 rounded-full bg-bg-muted hover:bg-bg-faint text-xs text-fg-base transition-colors"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
 
-                    {devGate && (mode === "pro" || mode === "deep") ? (
-                      <GateOverlay feature={mode === "deep" ? "deep" : "pro"} />
-                    ) : synthesisLoading ? (
-                      <div className="animate-pulse space-y-2">
-                        <div className="h-3 bg-slate-100 rounded w-full" />
-                        <div className="h-3 bg-slate-100 rounded w-11/12" />
-                        <div className="h-3 bg-slate-100 rounded w-9/12" />
-                        <p className="text-sm text-slate-500 pt-1 text-shimmer">
-                          {MODE_LABEL[mode]} · {LOADING_STAGES[stageIdx]}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="text-[15px] text-slate-700 whitespace-pre-line leading-relaxed">
-                        {renderSynthesisWithCitations(synthesis, papers, onSelectPaper)}
-                      </div>
-                    )}
-                  </div>
+          {/* ─── ConsensusMeter — always visible, above synthesis ─── */}
+          {(mode === "pro" || mode === "deep") && (
+            devGate ? (
+              <div className="mb-6">
+                <GateOverlay feature={mode === "deep" ? "deep" : "pro"} />
+              </div>
+            ) : (
+              <div className="mb-6">
+                <ConsensusMeter4Way
+                  verdicts={verdicts}
+                  query={query}
+                  loading={meterLoading}
+                />
+              </div>
+            )
+          )}
+
+          {/* ─── Synthesis block — always visible ─── */}
+          <div className="mb-8">
+            {devGate && (mode === "pro" || mode === "deep") ? (
+              <GateOverlay feature={mode === "deep" ? "deep" : "pro"} />
+            ) : synthesisLoading ? (
+              /* Loading skeleton */
+              <div className="animate-pulse space-y-3">
+                <div className="h-3 bg-slate-100 rounded w-full" />
+                <div className="h-3 bg-slate-100 rounded w-11/12" />
+                <div className="h-3 bg-slate-100 rounded w-9/12" />
+                <div className="h-3 bg-slate-100 rounded w-10/12" />
+                <div className="h-3 bg-slate-100 rounded w-8/12" />
+                <p className="text-sm text-slate-400 pt-2">
+                  {MODE_LABEL[mode]} · {LOADING_STAGES[stageIdx]}
+                </p>
+              </div>
+            ) : synthesis ? (
+              <>
+                {/* Synthesis text with inline citation chips */}
+                <div className="text-[15px] text-fg-base whitespace-pre-line leading-relaxed">
+                  {renderSynthesisWithCitations(synthesis, papers, onSelectPaper)}
                 </div>
 
-              {/* Copy / Bookmark / Share bar */}
-              {!synthesisLoading && synthesis && (
-                <div className="flex items-center gap-1 mb-4 pl-10">
+                {/* Copy / Bookmark / Share bar */}
+                <div className="flex items-center gap-1 mt-4">
                   <button
                     onClick={() => {
                       navigator.clipboard?.writeText(synthesis).catch(() => {});
                       setCopied(true);
                       setTimeout(() => setCopied(false), 1500);
                     }}
-                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-bg-faint text-fg-muted transition-colors"
                     title={copied ? "Copied!" : "Copy answer"}
                   >
                     <Copy className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
-                    title="Bookmark thread"
+                    className="p-1.5 rounded-lg hover:bg-bg-faint text-fg-muted transition-colors"
+                    title="Bookmark"
                   >
                     <Bookmark className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
-                    title="Share thread"
+                    className="p-1.5 rounded-lg hover:bg-bg-faint text-fg-muted transition-colors"
+                    title="Share"
                   >
                     <Share2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              )}
+              </>
+            ) : null}
+          </div>
 
-              {/* Research Agent block — plan, searches, cited report */}
-              {mode === "agent" && (
-                <div className="mb-5">
-                  {devGate ? (
-                    <GateOverlay feature="agent" />
-                  ) : agentLoading && !agentResult ? (
-                    <div className="animate-pulse space-y-2">
-                      <div className="h-3 bg-slate-100 rounded w-1/2" />
-                      <div className="h-3 bg-slate-100 rounded w-2/3" />
-                      <div className="h-3 bg-slate-100 rounded w-3/4" />
-                      <p className="text-xs text-slate-400 pt-1">
-                        🤖 Research Agent · {LOADING_STAGES[stageIdx]}
-                      </p>
-                    </div>
-                  ) : agentResult ? (
-                    <div className="bg-gradient-to-br from-indigo-50/60 to-white border border-indigo-100 rounded-2xl p-4">
-                      {/* Plan */}
-                      <div className="mb-3">
-                        <p className="text-[11px] font-bold tracking-wide text-indigo-500 uppercase mb-2">
-                          Research Plan
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {agentResult.plan.map((item, i) => (
-                            <span
-                              key={i}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-indigo-100 text-xs text-slate-700"
-                            >
-                              <span className="w-4 h-4 rounded-full bg-indigo-500 text-white text-[9px] font-bold flex items-center justify-center">
-                                {i + 1}
-                              </span>
-                              {item.query}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Searches summary */}
-                      <div className="mb-3 text-xs text-slate-500">
-                        {agentResult.searches.map((s, i) => (
-                          <span key={i} className="mr-3">
-                            <span className="text-slate-400">{s.total.toLocaleString()}</span> results for "{s.query}"
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* Report */}
-                      <p className="text-[11px] font-bold tracking-wide text-indigo-500 uppercase mb-2">
-                        Research Report
-                      </p>
-                      <div className="text-[14px] text-slate-700 leading-relaxed">
-                        {renderSynthesisWithCitations(
-                          agentResult.answer,
-                          agentResult.papers,
-                          onSelectPaper
-                        )}
-                      </div>
-                    </div>
-                  ) : null}
+          {/* ─── Research Agent block ─── */}
+          {mode === "agent" && (
+            <div className="mb-8">
+              {devGate ? (
+                <GateOverlay feature="agent" />
+              ) : agentLoading && !agentResult ? (
+                <div className="animate-pulse space-y-3">
+                  <div className="h-3 bg-slate-100 rounded w-1/2" />
+                  <div className="h-3 bg-slate-100 rounded w-2/3" />
+                  <div className="h-3 bg-slate-100 rounded w-3/4" />
+                  <p className="text-xs text-slate-400 pt-1">
+                    Research Agent · {LOADING_STAGES[stageIdx]}
+                  </p>
                 </div>
-              )}
+              ) : agentResult ? (
+                <div className="bg-gradient-to-br from-indigo-50/60 to-white border border-indigo-100 rounded-2xl p-4">
+                  {/* Plan */}
+                  <div className="mb-3">
+                    <p className="text-[11px] font-bold tracking-wide text-indigo-500 uppercase mb-2">
+                      Research Plan
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {agentResult.plan.map((item, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-indigo-100 text-xs text-slate-700"
+                        >
+                          <span className="w-4 h-4 rounded-full bg-indigo-500 text-white text-[9px] font-bold flex items-center justify-center">
+                            {i + 1}
+                          </span>
+                          {item.query}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* ConsensusMeter 4-way — between synthesis and results, for Pro/Deep only */}
-              {(mode === "pro" || mode === "deep") && (
-                devGate ? (
-                  <GateOverlay feature={mode === "deep" ? "deep" : "pro"} compact />
-                ) : (
-                  <ConsensusMeter4Way
-                    verdicts={verdicts}
-                    query={query}
-                    loading={meterLoading}
-                  />
-                )
-              )}
+                  {/* Searches summary */}
+                  <div className="mb-3 text-xs text-slate-500">
+                    {agentResult.searches.map((s, i) => (
+                      <span key={i} className="mr-3">
+                        <span className="text-slate-400">{s.total.toLocaleString()}</span> results for "{s.query}"
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Report */}
+                  <p className="text-[11px] font-bold tracking-wide text-indigo-500 uppercase mb-2">
+                    Research Report
+                  </p>
+                  <div className="text-[14px] text-slate-700 leading-relaxed">
+                    {renderSynthesisWithCitations(agentResult.answer, agentResult.papers, onSelectPaper)}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 
-          {/* Results section — shown regardless of expand state */}
+          {/* ─── Results section ─── */}
           <div className="mb-2 flex items-center justify-between px-1">
-            <h3 className="text-sm font-semibold text-slate-700">
+            <h3 className="text-sm font-semibold text-fg-base">
               {papers.length > 0 ? `${papers.length} Results` : ""}
             </h3>
             {selectedPaperIds.size > 0 && (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-fg-muted">
                 {selectedPaperIds.size} selected — ask these papers below
               </p>
             )}
           </div>
 
+          {/* Filter bar above results */}
+          <div className="flex items-center gap-3 mb-4 px-1">
+            <div className="flex items-center gap-1.5 text-xs text-fg-muted">
+              <span>Sources</span>
+              <span className="text-fg-base">Corpus</span>
+            </div>
+            <div className="flex-1" />
+            <div className="flex items-center gap-1.5 text-xs text-fg-muted">
+              <span>Filter</span>
+              <span className="text-fg-base">References</span>
+            </div>
+          </div>
+
           {isLoadingPapers && papers.length === 0 ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse"
-                >
+                <div key={i} className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse">
                   <div className="h-4 bg-slate-100 rounded w-3/4 mb-3" />
                   <div className="h-3 bg-slate-100 rounded w-full mb-2" />
                   <div className="h-3 bg-slate-100 rounded w-2/3" />
@@ -432,18 +462,18 @@ export function ThreadView({
             </div>
           )}
 
-          {/* Follow-up messages (consensus.app Threads) */}
+          {/* ─── Follow-up messages ─── */}
           {followUps.map((msg, i) => (
             <div key={i} className="mt-8">
               {msg.role === "user" ? (
                 <div className="flex justify-end mb-4">
-                  <div className="bg-cyan-500 text-white rounded-2xl rounded-tr-md px-4 py-2.5 text-[15px] max-w-[80%] leading-snug">
+                  <div className="bg-indigo-500 text-white rounded-2xl rounded-tr-md px-4 py-2.5 text-[15px] max-w-[80%] leading-snug">
                     {msg.content}
                   </div>
                 </div>
               ) : (
                 <div className="flex items-start gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <Sparkles className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 text-[15px] text-slate-700 whitespace-pre-line leading-relaxed">
@@ -456,7 +486,7 @@ export function ThreadView({
 
           {followUpLoading && (
             <div className="mt-8 flex items-start gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-cyan-500 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
                 <Sparkles className="w-4 h-4 text-white animate-pulse" />
               </div>
               <div className="text-sm text-slate-400 pt-1.5">Thinking…</div>
@@ -481,7 +511,7 @@ export function ThreadView({
         </div>
       </div>
 
-      {/* Pinned follow-up input */}
+      {/* ─── Pinned follow-up input ─── */}
       <div className="border-t border-slate-200 bg-white/95 backdrop-blur px-6 lg:px-10 py-4 sticky bottom-0">
         <div className="max-w-3xl mx-auto">
           <div className="relative bg-slate-50 border border-slate-200 focus-within:border-slate-300 rounded-[20px] shadow-sm transition-colors">
@@ -499,32 +529,17 @@ export function ThreadView({
                   ? `Ask these ${selectedPaperIds.size} papers...`
                   : "Ask a follow-up..."
               }
+              className="w-full bg-transparent px-4 py-3 pr-12 text-[15px] text-slate-700 placeholder:text-slate-400 resize-none rounded-[20px] outline-none"
               rows={1}
-              disabled={followUpLoading}
-              className="block w-full resize-none outline-none bg-transparent text-[15px] text-slate-800 placeholder:text-slate-400 pl-4 pr-28 py-3.5 max-h-[140px]"
-              style={{ overflowY: "auto" }}
             />
-            <div className="absolute right-2.5 bottom-2.5 flex items-center gap-1.5">
-              <button
-                className="flex items-center gap-1 px-2 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
-                title="Filter results"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={submitFollowUp}
-                disabled={!followInput.trim() || followUpLoading}
-                aria-label="Send follow-up"
-                className="w-8 h-8 rounded-full bg-cyan-500 hover:bg-cyan-600 disabled:bg-slate-200 flex items-center justify-center text-white transition-colors"
-              >
-                <ArrowUp className="w-4 h-4" />
-              </button>
-            </div>
+            <button
+              onClick={submitFollowUp}
+              disabled={!followInput.trim() || followUpLoading}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-indigo-500 text-white disabled:opacity-30 hover:bg-indigo-600 transition-colors"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
           </div>
-          <p className="text-[11px] text-slate-400 text-center mt-2">
-            Consensus can make mistakes. Every answer is grounded in the papers
-            shown above.
-          </p>
         </div>
       </div>
     </div>
